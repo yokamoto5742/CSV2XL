@@ -5,15 +5,12 @@ import polars as pl
 from openpyxl import load_workbook
 import datetime
 
-VERSION = "0.0.1"
+VERSION = "0.0.2"
 LAST_UPDATED = "2024/12/12"
 
 def read_csv_with_encoding(file_path):
-    """
-    異なるエンコーディングでCSVファイルを読み込む
-    4行目から読み込みを開始
-    """
     encodings = ['shift-jis', 'cp932', 'utf-8']
+    schema_overrides = {"患者ID": pl.Int64}
 
     for encoding in encodings:
         try:
@@ -23,7 +20,8 @@ def read_csv_with_encoding(file_path):
                 separator=',',
                 skip_rows=3,  # 最初の3行をスキップ（4行目から読み込み）
                 has_header=True,  # 4行目をヘッダーとして使用
-                infer_schema_length=0
+                infer_schema_length=0,
+                schema_overrides=schema_overrides
             )
 
             if len(df.columns) > 1:
@@ -40,7 +38,6 @@ def read_csv_with_encoding(file_path):
 
 
 def process_csv_data(df):
-    """CSVデータの加工処理を行う"""
     try:
         print("処理前の列名:", df.columns)
 
@@ -60,6 +57,12 @@ def process_csv_data(df):
 
         # A列からC列を削除
         df = df.select(df.columns[3:])
+
+        df = df.filter(
+            ~pl.col(df.columns[3]).str.contains("訪問看護指示書") &
+            ~pl.col(df.columns[3]).str.contains("訪問リハビリ指示書") &
+            ~pl.col(df.columns[3]).str.contains("精神訪問看護指示書")
+        )
 
         print("処理後の列名:", df.columns)
         return df
@@ -115,23 +118,33 @@ def transfer_csv_to_excel():
         last_row = ws.max_row
 
         # DataFrameのデータをExcelに書き込む
-        data_to_write = df.to_numpy().tolist()
+        # データ型の互換性エラーを回避するため、文字列型に変換
+        data_to_write = df.with_columns([
+            pl.col('*').cast(pl.String)
+        ]).to_numpy().tolist()
 
         for i, row in enumerate(data_to_write):
             for j, value in enumerate(row):
-                # datetime型の値を文字列に変換
-                if isinstance(value, (datetime.date, datetime.datetime)):
-                    value = value.strftime('%Y/%m/%d')
-                # None値を空文字列に変換
-                if value is None:
-                    value = ""
-                # last_row + 1から開始し、データを書き込む
-                ws.cell(row=last_row + 1 + i, column=j + 1, value=value)
+                cell = ws.cell(row=last_row + 1 + i, column=j + 1)
+
+                if j == 0:  # 日付列
+                    if isinstance(value, (datetime.date, datetime.datetime)):
+                        cell.value = value
+                        cell.number_format = 'yyyy/mm/dd'
+                    else:
+                        cell.value = value
+                elif j == 1:  # 患者ID列
+                    cell.value = value
+                    cell.number_format = '0'  # 数値として表示
+                else:  # その他の列
+                    # None値を空文字列に変換
+                    cell.value = "" if value is None else value
 
         # 変更を保存
         wb.save(excel_path)
         print("データの転記が完了しました。")
 
+        # Excelファイルを開く
         startfile(excel_path)
 
     except Exception as e:
