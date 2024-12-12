@@ -10,7 +10,6 @@ LAST_UPDATED = "2024/12/12"
 
 def read_csv_with_encoding(file_path):
     encodings = ['shift-jis', 'cp932', 'utf-8']
-    schema_overrides = {"患者ID": pl.Int64}
 
     for encoding in encodings:
         try:
