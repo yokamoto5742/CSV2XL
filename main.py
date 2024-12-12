@@ -14,6 +14,9 @@ def read_csv_with_encoding(file_path):
 
     for encoding in encodings:
         try:
+            schema = {
+                "患者ID": pl.Int64,  # 患者IDを明示的に整数型として指定
+            }
             df = pl.read_csv(
                 file_path,
                 encoding=encoding,
@@ -21,7 +24,7 @@ def read_csv_with_encoding(file_path):
                 skip_rows=3,  # 最初の3行をスキップ（4行目から読み込み）
                 has_header=True,  # 4行目をヘッダーとして使用
                 infer_schema_length=0,
-                schema_overrides=schema_overrides
+                schema_overrides=schema
             )
 
             if len(df.columns) > 1:
@@ -117,28 +120,31 @@ def transfer_csv_to_excel():
         # 最終行を取得
         last_row = ws.max_row
 
-        # DataFrameのデータをExcelに書き込む
-        # データ型の互換性エラーを回避するため、文字列型に変換
-        data_to_write = df.with_columns([
+        temp_df = df.select([
             pl.col('*').cast(pl.String)
-        ]).to_numpy().tolist()
+        ])
+        data_to_write = temp_df.to_numpy().tolist()
 
         for i, row in enumerate(data_to_write):
             for j, value in enumerate(row):
                 cell = ws.cell(row=last_row + 1 + i, column=j + 1)
 
-                if j == 0:  # 日付列
-                    if isinstance(value, (datetime.date, datetime.datetime)):
-                        cell.value = value
+                if j == 0:  # 預り日（日付列）
+                    try:
+                        # 文字列から日付に戻す
+                        date_value = datetime.datetime.strptime(value, '%Y-%m-%d')
+                        cell.value = date_value
                         cell.number_format = 'yyyy/mm/dd'
-                    else:
+                    except:
                         cell.value = value
                 elif j == 1:  # 患者ID列
-                    cell.value = value
-                    cell.number_format = '0'  # 数値として表示
+                    try:
+                        cell.value = int(value.replace(',', ''))  # カンマを除去して整数に変換
+                        cell.number_format = '0'  # 数値フォーマットを設定
+                    except:
+                        cell.value = value
                 else:  # その他の列
-                    # None値を空文字列に変換
-                    cell.value = "" if value is None else value
+                    cell.value = value if value is not None else ""
 
         # 変更を保存
         wb.save(excel_path)
