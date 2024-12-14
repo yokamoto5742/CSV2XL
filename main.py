@@ -83,8 +83,11 @@ def transfer_csv_to_excel():
         downloads_path = config.get_downloads_path()
         excel_path = config.get_excel_path()
 
-        # CSVファイルを検索（最新のCSVファイルを使用）
-        csv_files = [f for f in os.listdir(downloads_path) if f.endswith('.csv')]
+        csv_files = [f for f in os.listdir(downloads_path)
+                     if f.endswith('.csv') and
+                     len(f.split('_')) == 2 and  # アンダースコアで分割
+                     (3 <= len(f.split('_')[0]) <= 4) and  # 最初の部分が3-4桁
+                     len(f.split('_')[1].split('.')[0]) == 14]  # 2番目の部分が14桁（拡張子を除く）
         if not csv_files:
             print("ダウンロードフォルダにCSVファイルが見つかりません。")
             return
@@ -107,11 +110,11 @@ def transfer_csv_to_excel():
 
         df = process_csv_data(df)
 
-        if not os.path.exists(excel_path):
-            print(f"Excelファイルが見つかりません: {excel_path}")
+        if not os.path.exists(excel_path) or not excel_path.endswith('.xlsm'):
+            print(f"マクロ付きExcelファイル(.xlsm)が見つかりません: {excel_path}")
             return
 
-        wb = load_workbook(excel_path)
+        wb = load_workbook(filename=excel_path, read_only=False, keep_vba=True)
         ws = wb.active
 
         # 最終行を取得
