@@ -85,6 +85,7 @@ class ExcludeDocsDialog(QDialog):
         super().accept()
 
 
+# gui.py の FolderPathDialog クラスを以下のように修正
 class FolderPathDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -93,20 +94,21 @@ class FolderPathDialog(QDialog):
 
         layout = QVBoxLayout()
 
-        # パス入力フィールド
-        self.input_field = QLineEdit()
-        layout.addWidget(QLabel("フォルダパス:"))
-        layout.addWidget(self.input_field)
+        # ダウンロードパス設定
+        layout.addWidget(QLabel("ダウンロードフォルダ:"))
+        self.downloads_path = QLineEdit()
+        layout.addWidget(self.downloads_path)
+        downloads_browse = QPushButton("参照...")
+        downloads_browse.clicked.connect(lambda: self.browse_folder('downloads'))
+        layout.addWidget(downloads_browse)
 
-        # 参照ボタン
-        browse_button = QPushButton("参照...")
-        browse_button.clicked.connect(self.browse_folder)
-        layout.addWidget(browse_button)
-
-        # パスリスト
-        self.path_list = QListWidget()
-        layout.addWidget(QLabel("登録済みパス:"))
-        layout.addWidget(self.path_list)
+        # Excelファイルパス設定
+        layout.addWidget(QLabel("Excelファイルパス:"))
+        self.excel_path = QLineEdit()
+        layout.addWidget(self.excel_path)
+        excel_browse = QPushButton("参照...")
+        excel_browse.clicked.connect(lambda: self.browse_folder('excel'))
+        layout.addWidget(excel_browse)
 
         # ボタン
         buttons = QDialogButtonBox(
@@ -115,17 +117,6 @@ class FolderPathDialog(QDialog):
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-
-        # 追加ボタン
-        add_button = QPushButton("追加")
-        add_button.clicked.connect(self.add_path)
-
-        # 削除ボタン
-        delete_button = QPushButton("削除")
-        delete_button.clicked.connect(self.delete_selected)
-
-        layout.addWidget(add_button)
-        layout.addWidget(delete_button)
         layout.addWidget(buttons)
 
         self.setLayout(layout)
@@ -135,33 +126,32 @@ class FolderPathDialog(QDialog):
         self.load_paths()
 
     def load_paths(self):
-        directories = self.config.get_directories()
-        for directory in directories:
-            if directory.strip():
-                self.path_list.addItem(directory.strip())
+        self.downloads_path.setText(self.config.get_downloads_path())
+        self.excel_path.setText(self.config.get_excel_path())
 
-    def browse_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "フォルダの選択")
-        if folder:
-            self.input_field.setText(folder)
-
-    def add_path(self):
-        path = self.input_field.text().strip()
-        if path:
-            self.path_list.addItem(path)
-            self.input_field.clear()
-
-    def delete_selected(self):
-        current_item = self.path_list.currentItem()
-        if current_item:
-            self.path_list.takeItem(self.path_list.row(current_item))
+    def browse_folder(self, path_type):
+        if path_type == 'downloads':
+            folder = QFileDialog.getExistingDirectory(
+                self,
+                "ダウンロードフォルダの選択",
+                self.downloads_path.text()
+            )
+            if folder:
+                self.downloads_path.setText(folder)
+        else:
+            file, _ = QFileDialog.getOpenFileName(
+                self,
+                "Excelファイルの選択",
+                self.excel_path.text(),
+                "Excel Files (*.xlsx *.xlsm)"
+            )
+            if file:
+                self.excel_path.setText(file)
 
     def accept(self):
         # 設定の保存
-        paths = []
-        for i in range(self.path_list.count()):
-            paths.append(self.path_list.item(i).text())
-        self.config.set_directories(paths)
+        self.config.set_downloads_path(self.downloads_path.text())
+        self.config.set_excel_path(self.excel_path.text())
         super().accept()
 
 
@@ -180,7 +170,6 @@ class MainWindow(QMainWindow):
 
         # タイトル
         title_label = QLabel("Papyrus書類受付リスト")
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
 
         # CSVファイル取り込みボタン

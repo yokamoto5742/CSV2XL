@@ -39,6 +39,28 @@ class ConfigManager:
         docs = self.config.get('ExcludeDocs', 'list', fallback='')
         return [doc.strip() for doc in docs.split(',') if doc.strip()]
 
+    def get_downloads_path(self) -> str:
+        if 'Paths' not in self.config:
+            return str(Path.home() / "Downloads")
+        return self.config.get('Paths', 'downloads_path', fallback=str(Path.home() / "Downloads"))
+
+    def get_excel_path(self) -> str:
+        if 'Paths' not in self.config:
+            return r"C:\Shinseikai\CSV2XL\医療文書担当一覧.xlsm"
+        return self.config.get('Paths', 'excel_path', fallback=r"C:\Shinseikai\CSV2XL\医療文書担当一覧.xlsm")
+
+    def set_downloads_path(self, path: str) -> None:
+        if 'Paths' not in self.config:
+            self.config['Paths'] = {}
+        self.config['Paths']['downloads_path'] = path
+        self.save_config()
+
+    def set_excel_path(self, path: str) -> None:
+        if 'Paths' not in self.config:
+            self.config['Paths'] = {}
+        self.config['Paths']['excel_path'] = path
+        self.save_config()
+
     def save_config(self) -> None:
         try:
             with open(self.config_file, 'w', encoding='utf-8') as configfile:

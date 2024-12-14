@@ -79,8 +79,9 @@ def process_csv_data(df):
 
 def transfer_csv_to_excel():
     try:
-        downloads_path = str(Path.home() / "Downloads")
-        excel_path = r"C:\Shinseikai\CSV2XL\医療文書担当一覧.xlsm"
+        config = ConfigManager()
+        downloads_path = config.get_downloads_path()
+        excel_path = config.get_excel_path()
 
         # CSVファイルを検索（最新のCSVファイルを使用）
         csv_files = [f for f in os.listdir(downloads_path) if f.endswith('.csv')]
