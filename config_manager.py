@@ -2,7 +2,7 @@ import configparser
 import os
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Final, List
 
 def get_config_path() -> Path:
     # 実行ファイルのディレクトリを取得
@@ -32,6 +32,12 @@ class ConfigManager:
                 self.config.read_string(content)
             except (UnicodeDecodeError, OSError) as e:
                 raise OSError(f"Failed to load config: {e}") from e
+
+    def get_exclude_docs(self) -> List[str]:
+        if 'ExcludeDocs' not in self.config:
+            return []
+        docs = self.config.get('ExcludeDocs', 'list', fallback='')
+        return [doc.strip() for doc in docs.split(',') if doc.strip()]
 
     def save_config(self) -> None:
         try:

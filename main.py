@@ -59,14 +59,19 @@ def process_csv_data(df):
         # A列からC列を削除
         df = df.select(df.columns[3:])
 
-        df = df.filter(
-            ~pl.col(df.columns[3]).str.contains("訪問看護指示書") &
-            ~pl.col(df.columns[3]).str.contains("訪問リハビリ指示書") &
-            ~pl.col(df.columns[3]).str.contains("精神訪問看護指示書")
-        )
+        config = ConfigManager()
+        exclude_docs = config.get_exclude_docs()
+
+        if exclude_docs:
+            filter_conditions = [~pl.col(df.columns[3]).str.contains(doc) for doc in exclude_docs]
+            combined_filter = filter_conditions[0]
+            for condition in filter_conditions[1:]:
+                combined_filter = combined_filter & condition
+            df = df.filter(combined_filter)
 
         print("処理後の列名:", df.columns)
         return df
+
     except Exception as e:
         print(f"データ処理中にエラーが発生しました: {str(e)}")
         raise
