@@ -7,7 +7,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from config_manager import ConfigManager
-from main import transfer_csv_to_excel
+from service_csv_excel_transfer import transfer_csv_to_excel
+from version import VERSION
 
 
 class ExcludeDocsDialog(QDialog):
@@ -85,7 +86,7 @@ class ExcludeDocsDialog(QDialog):
         super().accept()
 
 
-# gui.py の FolderPathDialog クラスを以下のように修正
+# app_window.py の FolderPathDialog クラスを以下のように修正
 class FolderPathDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -158,7 +159,7 @@ class FolderPathDialog(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CSV2XL v1.0.0")
+        self.setWindowTitle(f"CSV2XL v{VERSION}")
         self.setFixedSize(300, 200)
 
         # メインウィジェット
@@ -212,10 +213,3 @@ class MainWindow(QMainWindow):
     def show_folder_path_dialog(self):
         dialog = FolderPathDialog(self)
         dialog.exec()
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
