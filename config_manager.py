@@ -12,7 +12,7 @@ def get_config_path() -> Path:
         base_path = Path(os.path.dirname(os.path.abspath(__file__)))
     return base_path / 'config.ini'
 
-CONFIG_PATH: Final[Path] = get_config_path()
+CONFIG_PATH = get_config_path()
 
 class ConfigManager:
     def __init__(self, config_file: Path | str = CONFIG_PATH) -> None:

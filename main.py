@@ -4,6 +4,7 @@ from pathlib import Path
 import polars as pl
 from openpyxl import load_workbook
 import datetime
+from config_manager import ConfigManager
 
 VERSION = "0.0.2"
 LAST_UPDATED = "2024/12/12"
