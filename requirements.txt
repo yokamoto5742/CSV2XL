@@ -7,5 +7,8 @@ pefile==2023.2.7
 polars==1.17.1
 pyinstaller==6.11.1
 pyinstaller-hooks-contrib==2024.10
+PyQt6==6.8.0
+PyQt6-Qt6==6.8.1
+PyQt6_sip==13.9.1
 pywin32-ctypes==0.2.3
 setuptools==75.6.0
