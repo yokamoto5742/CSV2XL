@@ -4,6 +4,7 @@ from pathlib import Path
 import polars as pl
 from openpyxl import load_workbook
 import datetime
+import win32com.client
 from config_manager import ConfigManager
 
 def read_csv_with_encoding(file_path):
@@ -44,38 +45,28 @@ def process_csv_data(df):
         original_columns = df.columns
         unique_columns = []
         for i, col in enumerate(original_columns):
-            if col is None:  # None チェックを追加
-                col = f"unnamed_{i}"
             unique_columns.append(f"col_{i}_{col}")
-
-        # カラム名の変更処理
         df = df.select([
             pl.col(old_name).alias(new_name)
             for old_name, new_name in zip(original_columns, unique_columns)
         ])
 
-        # 以下の行を修正（インデックスベースの列削除を修正）
-        if len(df.columns) > 11:  # K列とI列を削除する前に列数チェック
-            columns_to_keep = [i for i in range(len(df.columns)) if i not in [8, 10]]
-            df = df.select([df.columns[i] for i in columns_to_keep])
+        # K列とI列を削除 (インデックスベースで削除)
+        columns_to_keep = [i for i in range(len(df.columns)) if i not in [8, 10]]
+        df = df.select([df.columns[i] for i in columns_to_keep])
 
-        # A列からC列を削除する前に列数チェック
-        if len(df.columns) > 3:
-            df = df.select(df.columns[3:])
+        # A列からC列を削除
+        df = df.select(df.columns[3:])
 
-        # exclude_docs が空文字列の場合のチェックを追加
         config = ConfigManager()
         exclude_docs = config.get_exclude_docs()
-        if exclude_docs and isinstance(exclude_docs, str):
-            exclude_docs = [doc.strip() for doc in exclude_docs.split(',') if doc.strip()]
 
         if exclude_docs:
             filter_conditions = [~pl.col(df.columns[3]).str.contains(doc) for doc in exclude_docs]
-            if filter_conditions:
-                combined_filter = filter_conditions[0]
-                for condition in filter_conditions[1:]:
-                    combined_filter = combined_filter & condition
-                df = df.filter(combined_filter)
+            combined_filter = filter_conditions[0]
+            for condition in filter_conditions[1:]:
+                combined_filter = combined_filter & condition
+            df = df.filter(combined_filter)
 
         print("処理後の列名:", df.columns)
         return df
