@@ -86,7 +86,81 @@ class ExcludeDocsDialog(QDialog):
         super().accept()
 
 
-# app_window.py の FolderPathDialog クラスを以下のように修正
+class ExcludeDoctorsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("除外する医師名の設定")
+        self.setModal(True)
+
+        layout = QVBoxLayout()
+
+        # 医師名入力フィールド
+        self.input_field = QLineEdit()
+        layout.addWidget(QLabel("除外する医師名:"))
+        layout.addWidget(self.input_field)
+
+        # 登録済み医師名リスト
+        self.doc_list = QListWidget()
+        layout.addWidget(QLabel("登録済み医師名:"))
+        layout.addWidget(self.doc_list)
+
+        # ボタン
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        # 追加ボタン
+        add_button = QPushButton("追加")
+        add_button.clicked.connect(self.add_doctor)
+
+        # 削除ボタン
+        delete_button = QPushButton("削除")
+        delete_button.clicked.connect(self.delete_selected)
+
+        layout.addWidget(add_button)
+        layout.addWidget(delete_button)
+        layout.addWidget(buttons)
+
+        self.setLayout(layout)
+
+        # 設定の読み込み
+        self.config = ConfigManager()
+        self.load_doctors()
+
+    def load_doctors(self):
+        if 'ExcludeDoctors' in self.config.config:
+            docs = self.config.config['ExcludeDoctors'].get('list', '').split(',')
+            for doc in docs:
+                if doc.strip():
+                    self.doc_list.addItem(doc.strip())
+
+    def add_doctor(self):
+        doc_name = self.input_field.text().strip()
+        if doc_name:
+            self.doc_list.addItem(doc_name)
+            self.input_field.clear()
+
+    def delete_selected(self):
+        current_item = self.doc_list.currentItem()
+        if current_item:
+            self.doc_list.takeItem(self.doc_list.row(current_item))
+
+    def accept(self):
+        # 設定の保存
+        docs = []
+        for i in range(self.doc_list.count()):
+            docs.append(self.doc_list.item(i).text())
+
+        if 'ExcludeDoctors' not in self.config.config:
+            self.config.config['ExcludeDoctors'] = {}
+        self.config.config['ExcludeDoctors']['list'] = ','.join(docs)
+        self.config.save_config()
+        super().accept()
+
+
 class FolderPathDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -187,6 +261,11 @@ class MainWindow(QMainWindow):
         exclude_docs_button.clicked.connect(self.show_exclude_docs_dialog)
         layout.addWidget(exclude_docs_button)
 
+        # 除外する医師名ボタン（settings_labelの下に追加）
+        exclude_doctors_button = QPushButton("除外する医師名")
+        exclude_doctors_button.clicked.connect(self.show_exclude_doctors_dialog)
+        layout.addWidget(exclude_doctors_button)
+
         # フォルダパスボタン
         folder_path_button = QPushButton("フォルダパス")
         folder_path_button.clicked.connect(self.show_folder_path_dialog)
@@ -208,6 +287,10 @@ class MainWindow(QMainWindow):
 
     def show_exclude_docs_dialog(self):
         dialog = ExcludeDocsDialog(self)
+        dialog.exec()
+
+    def show_exclude_doctors_dialog(self):
+        dialog = ExcludeDoctorsDialog(self)
         dialog.exec()
 
     def show_folder_path_dialog(self):

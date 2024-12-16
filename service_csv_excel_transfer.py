@@ -60,6 +60,7 @@ def process_csv_data(df):
 
         config = ConfigManager()
         exclude_docs = config.get_exclude_docs()
+        exclude_doctors = config.get_exclude_doctors()
 
         if exclude_docs:
             filter_conditions = [~pl.col(df.columns[3]).str.contains(doc) for doc in exclude_docs]
@@ -67,6 +68,13 @@ def process_csv_data(df):
             for condition in filter_conditions[1:]:
                 combined_filter = combined_filter & condition
             df = df.filter(combined_filter)
+
+        if exclude_doctors:
+            doctor_filter_conditions = [~pl.col(df.columns[5]).str.contains(doc) for doc in exclude_doctors]
+            doctor_combined_filter = doctor_filter_conditions[0]
+            for condition in doctor_filter_conditions[1:]:
+                doctor_combined_filter = doctor_combined_filter & condition
+            df = df.filter(doctor_combined_filter)
 
         print("処理後の列名:", df.columns)
         return df

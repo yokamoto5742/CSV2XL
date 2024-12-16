@@ -39,6 +39,12 @@ class ConfigManager:
         docs = self.config.get('ExcludeDocs', 'list', fallback='')
         return [doc.strip() for doc in docs.split(',') if doc.strip()]
 
+    def get_exclude_doctors(self) -> List[str]:
+        if 'ExcludeDoctors' not in self.config:
+            return []
+        doctors = self.config.get('ExcludeDoctors', 'list', fallback='')
+        return [doctor.strip() for doctor in doctors.split(',') if doctor.strip()]
+
     def get_downloads_path(self) -> str:
         if 'Paths' not in self.config:
             return str(Path.home() / "Downloads")
