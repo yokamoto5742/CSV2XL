@@ -3,8 +3,10 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QPushButton, QLabel, QDialog, QLineEdit,
-    QListWidget, QDialogButtonBox, QFileDialog
+    QListWidget, QDialogButtonBox, QFileDialog,
+    QMessageBox
 )
+from PyQt6.QtGui import QIntValidator
 from PyQt6.QtCore import Qt
 from config_manager import ConfigManager
 from service_csv_excel_transfer import transfer_csv_to_excel
@@ -230,11 +232,73 @@ class FolderPathDialog(QDialog):
         super().accept()
 
 
+class AppearanceDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("フォントと画面サイズ")
+        self.setModal(True)
+
+        layout = QVBoxLayout()
+
+        # フォントサイズ設定
+        layout.addWidget(QLabel("フォントサイズ:"))
+        self.font_size_input = QLineEdit()
+        self.font_size_input.setValidator(QIntValidator(6, 72))
+        layout.addWidget(self.font_size_input)
+
+        # ウィンドウサイズ設定
+        layout.addWidget(QLabel("ウィンドウの幅:"))
+        self.window_width_input = QLineEdit()
+        self.window_width_input.setValidator(QIntValidator(200, 1000))
+        layout.addWidget(self.window_width_input)
+
+        layout.addWidget(QLabel("ウィンドウの高さ:"))
+        self.window_height_input = QLineEdit()
+        self.window_height_input.setValidator(QIntValidator(150, 800))
+        layout.addWidget(self.window_height_input)
+
+        # ボタン
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self.setLayout(layout)
+
+        # 設定の読み込み
+        self.config = ConfigManager()
+        self.load_settings()
+
+    def load_settings(self):
+        self.font_size_input.setText(str(self.config.get_font_size()))
+        window_size = self.config.get_window_size()
+        self.window_width_input.setText(str(window_size[0]))
+        self.window_height_input.setText(str(window_size[1]))
+
+    def accept(self):
+        # 設定の保存
+        self.config.set_font_size(int(self.font_size_input.text()))
+        self.config.set_window_size(
+            int(self.window_width_input.text()),
+            int(self.window_height_input.text())
+        )
+        QMessageBox.information(self, "設定完了", "設定を保存しました。\n変更を適用するにはアプリケーションを再起動してください。")
+        super().accept()
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.config = ConfigManager()
+        font = self.font()
+        font.setPointSize(self.config.get_font_size())
+        self.setFont(font)
+        window_size = self.config.get_window_size()
+        self.setFixedSize(*window_size)
         self.setWindowTitle(f"CSV2XL v{VERSION}")
-        self.setFixedSize(300, 200)
 
         # メインウィジェット
         main_widget = QWidget()
@@ -266,6 +330,11 @@ class MainWindow(QMainWindow):
         exclude_doctors_button.clicked.connect(self.show_exclude_doctors_dialog)
         layout.addWidget(exclude_doctors_button)
 
+        # 外観設定ボタン
+        appearance_button = QPushButton("フォントと画面サイズ")
+        appearance_button.clicked.connect(self.show_appearance_dialog)
+        layout.addWidget(appearance_button)
+
         # フォルダパスボタン
         folder_path_button = QPushButton("フォルダパス")
         folder_path_button.clicked.connect(self.show_folder_path_dialog)
@@ -291,6 +360,10 @@ class MainWindow(QMainWindow):
 
     def show_exclude_doctors_dialog(self):
         dialog = ExcludeDoctorsDialog(self)
+        dialog.exec()
+
+    def show_appearance_dialog(self):
+        dialog = AppearanceDialog(self)
         dialog.exec()
 
     def show_folder_path_dialog(self):

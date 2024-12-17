@@ -67,6 +67,31 @@ class ConfigManager:
         self.config['Paths']['excel_path'] = path
         self.save_config()
 
+    def get_font_size(self) -> int:
+        if 'Appearance' not in self.config:
+            return 9  # デフォルトのフォントサイズ
+        return self.config.getint('Appearance', 'font_size', fallback=9)
+
+    def get_window_size(self) -> tuple[int, int]:
+        if 'Appearance' not in self.config:
+            return 300, 200  # デフォルトのウィンドウサイズ
+        width = self.config.getint('Appearance', 'window_width', fallback=300)
+        height = self.config.getint('Appearance', 'window_height', fallback=200)
+        return width, height
+
+    def set_font_size(self, size: int) -> None:
+        if 'Appearance' not in self.config:
+            self.config['Appearance'] = {}
+        self.config['Appearance']['font_size'] = str(size)
+        self.save_config()
+
+    def set_window_size(self, width: int, height: int) -> None:
+        if 'Appearance' not in self.config:
+            self.config['Appearance'] = {}
+        self.config['Appearance']['window_width'] = str(width)
+        self.config['Appearance']['window_height'] = str(height)
+        self.save_config()
+
     def save_config(self) -> None:
         try:
             with open(self.config_file, 'w', encoding='utf-8') as configfile:
