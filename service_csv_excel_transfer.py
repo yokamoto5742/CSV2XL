@@ -75,6 +75,15 @@ def process_csv_data(df):
                 doctor_combined_filter = doctor_combined_filter & condition
             df = df.filter(doctor_combined_filter)
 
+            # D列とF列のスペースと*を除去（4列目と6列目）
+            df = df.with_columns([
+                pl.col(df.columns[3]).str.replace_all(r'[\s*]', ''),  # D列
+                pl.col(df.columns[5]).str.replace_all(r'[\s*]', '')  # F列
+            ])
+
+            print("処理後の列名:", df.columns)
+            return df
+
         print("処理後の列名:", df.columns)
         return df
 
