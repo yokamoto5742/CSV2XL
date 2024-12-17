@@ -307,12 +307,31 @@ class MainWindow(QMainWindow):
         # レイアウト
         layout = QVBoxLayout()
 
+        self.setStyleSheet("QMainWindow { border: 5px solid darkgreen; }")
+
         # タイトル
         title_label = QLabel("Papyrus書類受付リスト")
         layout.addWidget(title_label)
 
         # CSVファイル取り込みボタン
+        # CSVファイル取り込みボタン
         csv_button = QPushButton("CSVファイル取り込み")
+        csv_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                padding: 8px;
+                border: 2px solid #45a049;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
         csv_button.clicked.connect(self.import_csv)
         layout.addWidget(csv_button)
 
