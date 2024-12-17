@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QMessageBox
 )
 from PyQt6.QtGui import QIntValidator
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from config_manager import ConfigManager
 from service_csv_excel_transfer import transfer_csv_to_excel
 from version import VERSION

@@ -4,8 +4,9 @@ from pathlib import Path
 import polars as pl
 from openpyxl import load_workbook
 import datetime
-import win32com.client
 from config_manager import ConfigManager
+from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import QTimer
 
 def read_csv_with_encoding(file_path):
     encodings = ['shift-jis', 'utf-8']
@@ -136,7 +137,14 @@ def transfer_csv_to_excel():
             print(f"マクロ付きExcelファイル(.xlsm)が見つかりません: {excel_path}")
             return
 
-        wb = load_workbook(filename=excel_path, read_only=False, keep_vba=True)
+        try:
+            wb = load_workbook(filename=excel_path, read_only=False, keep_vba=True)
+        except PermissionError:
+            QMessageBox.critical(None,
+                                 "エラー",
+                                 "Excelファイルが別のプロセスで開かれています。\nExcelファイルを閉じてから再度実行してください。"
+                                 )
+            return
         ws = wb.active
 
         # 実際のデータが存在する最終行を取得
@@ -168,10 +176,26 @@ def transfer_csv_to_excel():
                 else:
                     cell.value = value if value is not None else ""
 
-        wb.save(excel_path)
-        print("データの転記が完了しました。")
+        try:
+            wb.save(excel_path)
+        except PermissionError:
+            QMessageBox.critical(None,
+                                 "エラー",
+                                 "Excelファイルが別のプロセスで開かれているため、保存できません。\nExcelファイルを閉じてから再度実行してください。"
+                                 )
+            if 'wb' in locals():
+                wb.close()
+            return
 
-        startfile(excel_path)
+        # 保存成功時のメッセージと処理
+        msg = QMessageBox()
+        msg.setWindowTitle("完了")
+        msg.setText("CSVファイルの取り込みが完了しました")
+        msg.show()
+        QTimer.singleShot(3000, msg.close)
+
+        excel_path_str = str(Path(excel_path).resolve())
+        os.startfile(excel_path_str)
 
     except Exception as e:
         print(f"エラーが発生しました: {str(e)}")
