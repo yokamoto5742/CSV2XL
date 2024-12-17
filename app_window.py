@@ -298,7 +298,7 @@ class MainWindow(QMainWindow):
         self.setFont(font)
         window_size = self.config.get_window_size()
         self.setFixedSize(*window_size)
-        self.setWindowTitle(f"CSV2XL v{VERSION}")
+        self.setWindowTitle(f"CSV取込アプリ v{VERSION}")
 
         # メインウィジェット
         main_widget = QWidget()
