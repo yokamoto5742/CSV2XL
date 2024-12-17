@@ -3,6 +3,7 @@ from os import startfile
 from pathlib import Path
 import polars as pl
 from openpyxl import load_workbook
+from openpyxl.styles import Alignment
 import datetime
 from config_manager import ConfigManager
 from PyQt6.QtWidgets import QMessageBox
@@ -100,6 +101,24 @@ def get_last_row(worksheet):
         last_row += 1
     return last_row
 
+
+def apply_cell_formats(worksheet, start_row):
+    last_row = get_last_row(worksheet)
+
+    # A列からF列までの範囲を設定
+    for row in range(start_row, last_row + 1):
+        for col in range(1, 7):  # A=1, F=6
+            cell = worksheet.cell(row=row, column=col)
+
+            # 縦位置を中央に設定（A-F列）
+            cell.alignment = Alignment(vertical='center')
+
+            # 横位置を設定
+            if col in [1, 2, 3, 5, 6]:  # A-C列とE,F列
+                cell.alignment = Alignment(vertical='center', horizontal='center')
+            elif col == 4:  # D列
+                cell.alignment = Alignment(vertical='center', horizontal='left', shrink_to_fit=True)
+
 def transfer_csv_to_excel():
     try:
         config = ConfigManager()
@@ -175,6 +194,8 @@ def transfer_csv_to_excel():
                         cell.value = value
                 else:
                     cell.value = value if value is not None else ""
+
+        apply_cell_formats(ws, last_row + 1)
 
         try:
             wb.save(excel_path)
