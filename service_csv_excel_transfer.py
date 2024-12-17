@@ -37,7 +37,6 @@ def read_csv_with_encoding(file_path):
 
     raise Exception("CSVファイルの読み込みに失敗しました")
 
-
 def process_csv_data(df):
     try:
         print("処理前の列名:", df.columns)
@@ -83,6 +82,14 @@ def process_csv_data(df):
         print(f"データ処理中にエラーが発生しました: {str(e)}")
         raise
 
+def get_last_row(worksheet):
+    last_row = 0
+    for row in worksheet.iter_rows():
+        if all(cell.value is None for cell in row):
+            break
+        last_row += 1
+    return last_row
+
 def transfer_csv_to_excel():
     try:
         config = ConfigManager()
@@ -123,8 +130,8 @@ def transfer_csv_to_excel():
         wb = load_workbook(filename=excel_path, read_only=False, keep_vba=True)
         ws = wb.active
 
-        # 最終行を取得
-        last_row = ws.max_row
+        # 実際のデータが存在する最終行を取得
+        last_row = get_last_row(ws)
 
         temp_df = df.select([
             pl.col('*').cast(pl.String)
