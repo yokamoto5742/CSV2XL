@@ -114,11 +114,11 @@ def apply_cell_formats(worksheet, start_row):
             cell.alignment = Alignment(vertical='center')
 
             # 横位置を設定
-            if col in [1, 2, 3, 5, 6]:  # A-C列とE,F列
-                cell.alignment = Alignment(vertical='center', horizontal='center')
-            elif col == 4:  # D列
-                cell.alignment = Alignment(vertical='center', horizontal='left', shrink_to_fit=True)
+            if col in [1, 2, 5, 6]:  # A,B列とE,F列
+                cell.alignment = Alignment(horizontal='center')
 
+            elif col in [3, 4]:  # C列とD列
+                cell.alignment = Alignment(horizontal='left', shrink_to_fit=True)
 
 def transfer_csv_to_excel():
     try:
