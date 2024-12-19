@@ -1,6 +1,7 @@
 import os
 from os import startfile
 from pathlib import Path
+import shutil
 import polars as pl
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
@@ -119,6 +120,25 @@ def apply_cell_formats(worksheet, start_row):
 
             elif col in [3, 4]:  # C列とD列
                 cell.alignment = Alignment(horizontal='left', shrink_to_fit=True)
+
+
+def backup_excel_file(excel_path):
+    backup_dir = Path(r"C:\Shinseikai\CSV2XL\backup")
+
+    # バックアップディレクトリが存在しない場合は作成
+    if not backup_dir.exists():
+        backup_dir.mkdir(parents=True)
+
+    backup_path = backup_dir / f"backup_{Path(excel_path).name}"
+
+    try:
+        # ファイルをコピー（既存のファイルは上書き）
+        shutil.copy2(excel_path, backup_path)
+        print(f"バックアップを作成しました: {backup_path}")
+    except Exception as e:
+        print(f"バックアップ作成中にエラーが発生しました: {str(e)}")
+        raise
+
 
 def transfer_csv_to_excel():
     try:
@@ -253,6 +273,7 @@ def transfer_csv_to_excel():
         try:
             wb.save(excel_path)
             wb.close()
+            backup_excel_file(excel_path)
         except PermissionError:
             QMessageBox.critical(None,
                                  "エラー",
