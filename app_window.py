@@ -169,6 +169,10 @@ class FolderPathDialog(QDialog):
         self.setWindowTitle("フォルダパスの設定")
         self.setModal(True)
 
+        config = ConfigManager()
+        dialog_width, dialog_height = config.get_folder_dialog_size()
+        self.resize(dialog_width, dialog_height)
+
         layout = QVBoxLayout()
 
         # ダウンロードパス設定
@@ -186,6 +190,14 @@ class FolderPathDialog(QDialog):
         excel_browse = QPushButton("参照...")
         excel_browse.clicked.connect(lambda: self.browse_folder('excel'))
         layout.addWidget(excel_browse)
+
+        layout.addWidget(QLabel("バックアップフォルダ:"))
+        self.backup_path = QLineEdit()
+        layout.addWidget(self.backup_path)
+        backup_browse = QPushButton("参照...")
+        backup_browse.clicked.connect(lambda: self.browse_folder('backup'))
+        layout.addWidget(backup_browse)
+
 
         # ボタン
         buttons = QDialogButtonBox(
@@ -205,16 +217,20 @@ class FolderPathDialog(QDialog):
     def load_paths(self):
         self.downloads_path.setText(self.config.get_downloads_path())
         self.excel_path.setText(self.config.get_excel_path())
+        self.backup_path.setText(self.config.get_backup_path())
 
     def browse_folder(self, path_type):
-        if path_type == 'downloads':
+        if path_type in ['downloads', 'backup']:
+            title = "ダウンロードフォルダの選択" if path_type == 'downloads' else "バックアップフォルダの選択"
+            path_field = self.downloads_path if path_type == 'downloads' else self.backup_path
+
             folder = QFileDialog.getExistingDirectory(
                 self,
-                "ダウンロードフォルダの選択",
-                self.downloads_path.text()
+                title,
+                path_field.text()
             )
             if folder:
-                self.downloads_path.setText(folder)
+                path_field.setText(folder)
         else:
             file, _ = QFileDialog.getOpenFileName(
                 self,
@@ -230,6 +246,7 @@ class FolderPathDialog(QDialog):
         self.config.set_downloads_path(self.downloads_path.text())
         self.config.set_excel_path(self.excel_path.text())
         super().accept()
+        self.config.set_backup_path(self.backup_path.text())
 
 
 class AppearanceDialog(QDialog):

@@ -67,6 +67,24 @@ class ConfigManager:
         self.config['Paths']['excel_path'] = path
         self.save_config()
 
+    def get_backup_path(self) -> str:
+        if 'Paths' not in self.config:
+            return r"C:\Shinseikai\CSV2XL\backup"
+        return self.config.get('Paths', 'backup_path', fallback=r"C:\Shinseikai\CSV2XL\backup")
+
+    def set_backup_path(self, path: str) -> None:
+        if 'Paths' not in self.config:
+            self.config['Paths'] = {}
+        self.config['Paths']['backup_path'] = path
+        self.save_config()
+
+    def get_folder_dialog_size(self) -> tuple[int, int]:
+        if 'DialogSize' not in self.config:
+            return 400, 200  # デフォルトのダイアログサイズ
+        width = self.config.getint('DialogSize', 'folder_dialog_width', fallback=400)
+        height = self.config.getint('DialogSize', 'folder_dialog_height', fallback=200)
+        return width, height
+
     def get_font_size(self) -> int:
         if 'Appearance' not in self.config:
             return 9  # デフォルトのフォントサイズ
