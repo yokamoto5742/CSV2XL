@@ -85,6 +85,17 @@ class ConfigManager:
         height = self.config.getint('DialogSize', 'folder_dialog_height', fallback=200)
         return width, height
 
+    def get_processed_path(self) -> str:
+        if 'Paths' not in self.config:
+            return r"C:\Shinseikai\CSV2XL\processed"
+        return self.config.get('Paths', 'processed_path', fallback=r"C:\Shinseikai\CSV2XL\processed")
+
+    def set_processed_path(self, path: str) -> None:
+        if 'Paths' not in self.config:
+            self.config['Paths'] = {}
+        self.config['Paths']['processed_path'] = path
+        self.save_config()
+
     def get_font_size(self) -> int:
         if 'Appearance' not in self.config:
             return 9  # デフォルトのフォントサイズ

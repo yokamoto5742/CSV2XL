@@ -139,6 +139,36 @@ def backup_excel_file(excel_path):
         print(f"バックアップ作成中にエラーが発生しました: {str(e)}")
         raise
 
+def cleanup_old_files(processed_dir: Path):
+    current_time = datetime.datetime.now()
+    for file in processed_dir.glob("*.csv"):
+        file_time = datetime.datetime.fromtimestamp(file.stat().st_mtime)
+        if (current_time - file_time).days >= 3:
+            try:
+                file.unlink()
+                print(f"古いファイルを削除しました: {file}")
+            except Exception as e:
+                print(f"ファイル削除中にエラーが発生しました: {file} - {str(e)}")
+
+def process_completed_csv(csv_path: str) -> None:
+    try:
+        csv_file = Path(csv_path)
+        if not csv_file.exists():
+            print(f"処理対象のCSVファイルが見つかりません: {csv_path}")
+            return
+
+        config = ConfigManager()
+        processed_dir = Path(config.get_processed_path())
+        processed_dir.mkdir(exist_ok=True, parents=True)
+
+        new_path = processed_dir / csv_file.name
+        shutil.move(str(csv_file), str(new_path))
+        print(f"CSVファイルを移動しました: {new_path}")
+        cleanup_old_files(processed_dir)
+
+    except Exception as e:
+        print(f"CSVファイルの処理中にエラーが発生しました: {str(e)}")
+        raise
 
 def transfer_csv_to_excel():
     try:
@@ -288,6 +318,8 @@ def transfer_csv_to_excel():
         msg.setText("CSVファイルの取り込みが完了しました")
         msg.show()
         QTimer.singleShot(3000, msg.close)
+
+        process_completed_csv(latest_csv)
 
         excel_path_str = str(Path(excel_path).resolve())
         os.startfile(excel_path_str)
