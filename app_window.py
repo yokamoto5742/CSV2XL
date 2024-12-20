@@ -1,7 +1,8 @@
+import os
 import sys
 from pathlib import Path
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout,
+    QApplication, QMainWindow, QWidget, QVBoxLayout,QHBoxLayout,
     QPushButton, QLabel, QDialog, QLineEdit,
     QListWidget, QDialogButtonBox, QFileDialog,
     QMessageBox
@@ -177,27 +178,42 @@ class FolderPathDialog(QDialog):
 
         # ダウンロードパス設定
         layout.addWidget(QLabel("ダウンロードフォルダ:"))
+        downloads_layout = QHBoxLayout()
         self.downloads_path = QLineEdit()
-        layout.addWidget(self.downloads_path)
+        downloads_layout.addWidget(self.downloads_path)
         downloads_browse = QPushButton("参照...")
         downloads_browse.clicked.connect(lambda: self.browse_folder('downloads'))
-        layout.addWidget(downloads_browse)
+        downloads_layout.addWidget(downloads_browse)
+        downloads_open = QPushButton("開く")
+        downloads_open.clicked.connect(lambda: self.open_folder(self.downloads_path.text()))
+        downloads_layout.addWidget(downloads_open)
+        layout.addLayout(downloads_layout)
 
         # Excelファイルパス設定
         layout.addWidget(QLabel("Excelファイルパス:"))
+        excel_layout = QHBoxLayout()
         self.excel_path = QLineEdit()
-        layout.addWidget(self.excel_path)
+        excel_layout.addWidget(self.excel_path)
         excel_browse = QPushButton("参照...")
         excel_browse.clicked.connect(lambda: self.browse_folder('excel'))
-        layout.addWidget(excel_browse)
+        excel_layout.addWidget(excel_browse)
+        excel_open = QPushButton("開く")
+        excel_open.clicked.connect(lambda: self.open_folder(str(Path(self.excel_path.text()).parent)))
+        excel_layout.addWidget(excel_open)
+        layout.addLayout(excel_layout)
 
+        # バックアップフォルダ設定
         layout.addWidget(QLabel("バックアップフォルダ:"))
+        backup_layout = QHBoxLayout()
         self.backup_path = QLineEdit()
-        layout.addWidget(self.backup_path)
+        backup_layout.addWidget(self.backup_path)
         backup_browse = QPushButton("参照...")
         backup_browse.clicked.connect(lambda: self.browse_folder('backup'))
-        layout.addWidget(backup_browse)
-
+        backup_layout.addWidget(backup_browse)
+        backup_open = QPushButton("開く")
+        backup_open.clicked.connect(lambda: self.open_folder(self.backup_path.text()))
+        backup_layout.addWidget(backup_open)
+        layout.addLayout(backup_layout)
 
         # ボタン
         buttons = QDialogButtonBox(
@@ -213,6 +229,13 @@ class FolderPathDialog(QDialog):
         # 設定の読み込み
         self.config = ConfigManager()
         self.load_paths()
+
+    def open_folder(self, path: str) -> None:
+        """指定されたパスのフォルダをエクスプローラーで開く"""
+        if path and os.path.exists(path):
+            os.startfile(path)
+        else:
+            QMessageBox.warning(self, "警告", "指定されたフォルダが存在しません。")
 
     def load_paths(self):
         self.downloads_path.setText(self.config.get_downloads_path())
