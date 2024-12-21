@@ -326,13 +326,10 @@ def transfer_csv_to_excel():
 
         excel_path_str = str(Path(excel_path).resolve())
 
-        # win32comを使用してExcelを制御
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True
         workbook = excel.Workbooks.Open(excel_path_str)
         excel.WindowState = -4137  # xlMaximized
-
-        # Excelウィンドウをアクティブにする
         workbook.Windows(1).Activate()
 
         try:
@@ -340,6 +337,10 @@ def transfer_csv_to_excel():
             if share_button:
                 button_center = pyautogui.center(share_button)
                 pyautogui.click(button_center.x, button_center.y)
+                worksheet = workbook.ActiveSheet
+                last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row  # xlUp = -4162
+                worksheet.Cells(last_row, 1).Select()
+
         except Exception as e:
             print(f"共有ボタンのクリックに失敗しました: {str(e)}")
         finally:
