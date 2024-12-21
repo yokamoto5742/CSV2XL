@@ -126,9 +126,9 @@ def apply_cell_formats(worksheet, start_row):
 
 
 def backup_excel_file(excel_path):
-    backup_dir = Path(r"C:\Shinseikai\CSV2XL\backup")
+    config = ConfigManager()
+    backup_dir = Path(config.get_backup_path())
 
-    # バックアップディレクトリが存在しない場合は作成
     if not backup_dir.exists():
         backup_dir.mkdir(parents=True)
 
@@ -186,7 +186,7 @@ def transfer_csv_to_excel():
                      (3 <= len(f.split('_')[0]) <= 4) and
                      len(f.split('_')[1].split('.')[0]) == 14]
         if not csv_files:
-            print("ダウンロードフォルダにCSVファイルが見つかりません。")
+            QMessageBox.warning(None, "警告", "ダウンロードフォルダにCSVファイルが見つかりません。")
             return
 
         latest_csv = max([os.path.join(downloads_path, f) for f in csv_files],
