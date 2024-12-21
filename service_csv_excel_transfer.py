@@ -9,6 +9,9 @@ import datetime
 from config_manager import ConfigManager
 from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtCore import QTimer
+import time
+import pyautogui
+import win32com.client
 
 def read_csv_with_encoding(file_path):
     encodings = ['shift-jis', 'utf-8']
@@ -322,7 +325,26 @@ def transfer_csv_to_excel():
         process_completed_csv(latest_csv)
 
         excel_path_str = str(Path(excel_path).resolve())
-        os.startfile(excel_path_str)
+
+        # win32comを使用してExcelを制御
+        excel = win32com.client.Dispatch("Excel.Application")
+        excel.Visible = True
+        workbook = excel.Workbooks.Open(excel_path_str)
+        excel.WindowState = -4137  # xlMaximized
+
+        # Excelウィンドウをアクティブにする
+        workbook.Windows(1).Activate()
+
+        try:
+            share_button = pyautogui.locateOnScreen('share_button.png')
+            if share_button:
+                button_center = pyautogui.center(share_button)
+                pyautogui.click(button_center.x, button_center.y)
+        except Exception as e:
+            print(f"共有ボタンのクリックに失敗しました: {str(e)}")
+        finally:
+            # 操作が終わったらExcelは開いたままにする
+            excel = None
 
     except Exception as e:
         print(f"エラーが発生しました: {str(e)}")
