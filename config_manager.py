@@ -121,6 +121,31 @@ class ConfigManager:
         self.config['Appearance']['window_height'] = str(height)
         self.save_config()
 
+    def get_share_button_position(self) -> tuple[int, int]:
+        if 'ButtonPosition' not in self.config:
+            return 1450, 180  # デフォルトの座標
+        x = self.config.getint('ButtonPosition', 'share_button_x', fallback=1450)
+        y = self.config.getint('ButtonPosition', 'share_button_y', fallback=180)
+        return x, y
+
+    def set_share_button_position(self, x: int, y: int) -> None:
+        if 'ButtonPosition' not in self.config:
+            self.config['ButtonPosition'] = {}
+        self.config['ButtonPosition']['share_button_x'] = str(x)
+        self.config['ButtonPosition']['share_button_y'] = str(y)
+        self.save_config()
+
+    def get_share_button_wait_time(self) -> int:
+        if 'ButtonPosition' not in self.config:
+            return 3  # デフォルトの待機時間（秒）
+        return self.config.getint('ButtonPosition', 'share_button_wait_time', fallback=3)
+
+    def set_share_button_wait_time(self, seconds: int) -> None:
+        if 'ButtonPosition' not in self.config:
+            self.config['ButtonPosition'] = {}
+        self.config['ButtonPosition']['share_button_wait_time'] = str(seconds)
+        self.save_config()
+
     def save_config(self) -> None:
         try:
             with open(self.config_file, 'w', encoding='utf-8') as configfile:

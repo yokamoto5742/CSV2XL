@@ -342,10 +342,13 @@ def transfer_csv_to_excel():
             worksheet = workbook.ActiveSheet
             last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row  # xlUp = -4162
             worksheet.Cells(last_row, 1).Select()
-            # 3秒待機
-            time.sleep(3)
+
+            wait_time = config.get_share_button_wait_time()
+            time.sleep(wait_time)
+
             # 共有ボタンのクリック
-            pyautogui.click(1450, 180)
+            share_x, share_y = config.get_share_button_position()
+            pyautogui.click(share_x, share_y)
 
         except Exception as e:
             print(f"共有ボタンのクリックに失敗しました: {str(e)}")
