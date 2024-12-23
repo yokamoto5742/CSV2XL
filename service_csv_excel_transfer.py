@@ -1,5 +1,6 @@
 import os
 from os import startfile
+import sys
 from pathlib import Path
 import shutil
 import polars as pl
@@ -316,12 +317,6 @@ def transfer_csv_to_excel():
                 wb.close()
             return
 
-        msg = QMessageBox()
-        msg.setWindowTitle("完了")
-        msg.setText("CSVファイルの取り込みが完了しました")
-        msg.show()
-        QTimer.singleShot(3000, msg.close)
-
         process_completed_csv(latest_csv)
 
         excel_path_str = str(Path(excel_path).resolve())
@@ -333,7 +328,14 @@ def transfer_csv_to_excel():
         workbook.Windows(1).Activate()
 
         try:
-            share_button = pyautogui.locateOnScreen('share_button.png')
+            if getattr(sys, 'frozen', False):
+                base_path = Path(sys._MEIPASS)
+            else:
+                base_path = Path(os.path.dirname(os.path.abspath(__file__)))
+
+            share_button_path = str(base_path / 'share_button.png')
+
+            share_button = pyautogui.locateOnScreen(share_button_path)
             if share_button:
                 button_center = pyautogui.center(share_button)
                 pyautogui.click(button_center.x, button_center.y)
