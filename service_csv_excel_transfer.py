@@ -13,6 +13,7 @@ from PyQt6.QtCore import QTimer
 import time
 import pyautogui
 import win32com.client
+import win32gui
 
 def read_csv_with_encoding(file_path):
     encodings = ['shift-jis', 'utf-8']
@@ -319,29 +320,32 @@ def transfer_csv_to_excel():
 
         process_completed_csv(latest_csv)
 
-        excel_path_str = str(Path(excel_path).resolve())
+        def bring_excel_to_front():
+            # Excelのメインウィンドウのハンドルを取得（最大3回まで試行）
+            for _ in range(2):
+                hwnd = win32gui.FindWindow("XLMAIN", None)
+                if hwnd:
+                    win32gui.SetForegroundWindow(hwnd)
+                    return True
+                time.sleep(0.1)  # 少し待機
+            return False
 
+        excel_path_str = str(Path(excel_path).resolve())
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True
+        bring_excel_to_front()  # すぐに最前面に表示
         workbook = excel.Workbooks.Open(excel_path_str)
         excel.WindowState = -4137  # xlMaximized
         workbook.Windows(1).Activate()
 
         try:
-            if getattr(sys, 'frozen', False):
-                base_path = Path(sys._MEIPASS)
-            else:
-                base_path = Path(os.path.dirname(os.path.abspath(__file__)))
-
-            share_button_path = str(base_path / 'share_button.png')
-
-            share_button = pyautogui.locateOnScreen(share_button_path)
-            if share_button:
-                button_center = pyautogui.center(share_button)
-                pyautogui.click(button_center.x, button_center.y)
-                worksheet = workbook.ActiveSheet
-                last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row  # xlUp = -4162
-                worksheet.Cells(last_row, 1).Select()
+            worksheet = workbook.ActiveSheet
+            last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row  # xlUp = -4162
+            worksheet.Cells(last_row, 1).Select()
+            # 3秒待機
+            time.sleep(3)
+            # 共有ボタンのクリック
+            pyautogui.click(1450, 180)
 
         except Exception as e:
             print(f"共有ボタンのクリックに失敗しました: {str(e)}")

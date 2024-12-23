@@ -12,7 +12,6 @@ def build_executable():
         "--windowed",
         "--icon=assets/CSV2XL.ico",
         "--add-data", "config.ini;.",
-        "--add-data", "share_button.png;.",
         "main.py"
     ])
 
