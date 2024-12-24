@@ -382,6 +382,7 @@ def transfer_csv_to_excel():
             print(f"共有ボタンのクリックに失敗しました: {str(e)}")
         finally:
             # 操作が終わったらExcelは開いたままにする
+            pyautogui.hotkey('win', 'down')  # ウィンドウを最小化
             excel = None
 
     except Exception as e:
