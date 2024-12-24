@@ -8,7 +8,7 @@ import pyautogui
 class CoordinateTracker(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("座標トラッカー")
+        self.setWindowTitle("画面の座標表示")
         self.setFixedSize(300, 150)
 
         # メインウィジェット

@@ -11,6 +11,7 @@ from PyQt6.QtGui import QIntValidator
 from PyQt6.QtCore import Qt, QTimer
 from config_manager import ConfigManager
 from service_csv_excel_transfer import transfer_csv_to_excel
+from coordinate_tracker import CoordinateTracker
 from version import VERSION
 
 
@@ -275,7 +276,7 @@ class FolderPathDialog(QDialog):
 class AppearanceDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("フォントと画面サイズ")
+        self.setWindowTitle("フォントとウインドウサイズ")
         self.setModal(True)
 
         layout = QVBoxLayout()
@@ -332,6 +333,7 @@ class AppearanceDialog(QDialog):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.tracker = CoordinateTracker()
         self.config = ConfigManager()
         font = self.font()
         font.setPointSize(self.config.get_font_size())
@@ -375,31 +377,29 @@ class MainWindow(QMainWindow):
         csv_button.clicked.connect(self.import_csv)
         layout.addWidget(csv_button)
 
-        # 設定セクションのラベル
         settings_label = QLabel("設定")
         layout.addWidget(settings_label)
 
-        # 除外する文書名ボタン
         exclude_docs_button = QPushButton("除外する文書名")
         exclude_docs_button.clicked.connect(self.show_exclude_docs_dialog)
         layout.addWidget(exclude_docs_button)
 
-        # 除外する医師名ボタン（settings_labelの下に追加）
         exclude_doctors_button = QPushButton("除外する医師名")
         exclude_doctors_button.clicked.connect(self.show_exclude_doctors_dialog)
         layout.addWidget(exclude_doctors_button)
 
-        # 外観設定ボタン
-        appearance_button = QPushButton("フォントと画面サイズ")
+        appearance_button = QPushButton("フォントとウインドウサイズ")
         appearance_button.clicked.connect(self.show_appearance_dialog)
         layout.addWidget(appearance_button)
 
-        # フォルダパスボタン
+        coordinate_button = QPushButton("画面の座標表示")
+        coordinate_button.clicked.connect(self.show_coordinate_tracker)
+        layout.addWidget(coordinate_button)
+
         folder_path_button = QPushButton("フォルダパス")
         folder_path_button.clicked.connect(self.show_folder_path_dialog)
         layout.addWidget(folder_path_button)
 
-        # 閉じるボタン
         close_button = QPushButton("閉じる")
         close_button.clicked.connect(self.close)
         layout.addWidget(close_button)
@@ -424,6 +424,9 @@ class MainWindow(QMainWindow):
     def show_appearance_dialog(self):
         dialog = AppearanceDialog(self)
         dialog.exec()
+
+    def show_coordinate_tracker(self):
+        self.tracker.show()
 
     def show_folder_path_dialog(self):
         dialog = FolderPathDialog(self)
