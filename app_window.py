@@ -18,14 +18,14 @@ from version import VERSION
 class ExcludeDocsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("除外する文書名の設定")
+        self.setWindowTitle("除外する文書名")
         self.setModal(True)
 
         layout = QVBoxLayout()
 
         # 文書名入力フィールド
         self.input_field = QLineEdit()
-        layout.addWidget(QLabel("除外する文書名:"))
+        layout.addWidget(QLabel("除外する文書名を入力:"))
         layout.addWidget(self.input_field)
 
         # 登録済み文書名リスト
@@ -93,14 +93,14 @@ class ExcludeDocsDialog(QDialog):
 class ExcludeDoctorsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("除外する医師名の設定")
+        self.setWindowTitle("除外する医師名")
         self.setModal(True)
 
         layout = QVBoxLayout()
 
         # 医師名入力フィールド
         self.input_field = QLineEdit()
-        layout.addWidget(QLabel("除外する医師名:"))
+        layout.addWidget(QLabel("除外する医師名を入力:"))
         layout.addWidget(self.input_field)
 
         # 登録済み医師名リスト
@@ -168,7 +168,7 @@ class ExcludeDoctorsDialog(QDialog):
 class FolderPathDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("フォルダパスの設定")
+        self.setWindowTitle("フォルダの場所")
         self.setModal(True)
 
         config = ConfigManager()
@@ -396,7 +396,7 @@ class MainWindow(QMainWindow):
         coordinate_button.clicked.connect(self.show_coordinate_tracker)
         layout.addWidget(coordinate_button)
 
-        folder_path_button = QPushButton("フォルダパス")
+        folder_path_button = QPushButton("フォルダの場所")
         folder_path_button.clicked.connect(self.show_folder_path_dialog)
         layout.addWidget(folder_path_button)
 

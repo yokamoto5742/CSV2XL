@@ -9,7 +9,7 @@ class CoordinateTracker(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("画面の座標表示")
-        self.setFixedSize(300, 150)
+        self.setFixedSize(250, 150)
 
         # メインウィジェット
         central_widget = QWidget()
