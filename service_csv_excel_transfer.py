@@ -192,10 +192,6 @@ def sort_excel_data(worksheet):
             Order2=1,  # 1=昇順
             Key3=worksheet.Range("B2"),  # B列（患者ID）
             Order3=1,  # 1=昇順
-            Key4=worksheet.Range("F2"),  # F列（医師名）
-            Order4=1,  # 1=昇順
-            Key5=worksheet.Range("D2"),  # D列（文章名）
-            Order5=1,  # 1=昇順
             Header=1,  # 1=ヘッダーあり
             OrderCustom=1,
             MatchCase=False,
@@ -372,7 +368,9 @@ def transfer_csv_to_excel():
 
         try:
             worksheet = workbook.ActiveSheet
-            sort_excel_data(worksheet) # データをソートして最終行を取得
+            sort_excel_data(worksheet)
+
+            last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row  # xlUp = -4162
             worksheet.Cells(last_row, 1).Select()
 
             wait_time = config.get_share_button_wait_time()
@@ -384,7 +382,6 @@ def transfer_csv_to_excel():
             print(f"共有ボタンのクリックに失敗しました: {str(e)}")
         finally:
             # 操作が終わったらExcelは開いたままにする
-            excel.WindowState = -4140  # xlNormal
             excel = None
 
     except Exception as e:
