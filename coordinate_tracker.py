@@ -1,55 +1,55 @@
+import sys
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel
+from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtGui import QShortcut, QKeySequence
 import pyautogui
-import tkinter as tk
-from tkinter import ttk
-import keyboard
 
 
-class CoordinateTracker:
+class CoordinateTracker(QMainWindow):
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("座標トラッカー")
-        self.root.geometry("300x150")
+        super().__init__()
+        self.setWindowTitle("座標トラッカー")
+        self.setFixedSize(300, 150)
 
-        # メインフレーム
-        self.frame = ttk.Frame(self.root, padding="10")
-        self.frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        # メインウィジェット
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
 
         # 座標表示ラベル
-        self.coord_var = tk.StringVar(value="座標: (0, 0)")
-        self.coord_label = ttk.Label(self.frame, textvariable=self.coord_var)
-        self.coord_label.grid(row=0, column=0, pady=10)
+        self.coord_label = QLabel("座標: (0, 0)")
+        self.coord_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.coord_label)
 
         # 説明ラベル
-        self.info_label = ttk.Label(
-            self.frame,
-            text="Escキーで終了\nSpaceキーで座標をコピー"
-        )
-        self.info_label.grid(row=1, column=0, pady=10)
+        info_label = QLabel("Escキーで終了\nSpaceキーで座標をコピー")
+        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(info_label)
 
-        # 更新処理
-        self.update_coordinates()
+        # タイマーで座標更新
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_coordinates)
+        self.timer.start(100)  # 100ミリ秒ごとに更新
 
-        # キーバインド
-        keyboard.on_press_key("space", self.copy_coordinates)
-        keyboard.on_press_key("esc", self.quit_app)
+        # ショートカットキー
+        QShortcut(QKeySequence(Qt.Key.Key_Space), self).activated.connect(self.copy_coordinates)
+        QShortcut(QKeySequence(Qt.Key.Key_Escape), self).activated.connect(self.close)
 
     def update_coordinates(self):
         x, y = pyautogui.position()
-        self.coord_var.set(f"座標: ({x}, {y})")
-        self.root.after(100, self.update_coordinates)
+        self.coord_label.setText(f"座標: ({x}, {y})")
 
-    def copy_coordinates(self, _):
+    def copy_coordinates(self):
         x, y = pyautogui.position()
-        self.root.clipboard_clear()
-        self.root.clipboard_append(f"{x}, {y}")
+        QApplication.clipboard().setText(f"{x}, {y}")
 
-    def quit_app(self, _):
-        self.root.quit()
 
-    def run(self):
-        self.root.mainloop()
+def main():
+    app = QApplication(sys.argv)
+    tracker = CoordinateTracker()
+    tracker.show()
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
-    tracker = CoordinateTracker()
-    tracker.run()
+    main()
