@@ -178,9 +178,8 @@ def process_completed_csv(csv_path: str) -> None:
 
 def sort_excel_data(worksheet):
     try:
-        # 最終行と最終列を取得
+        # 最終行を取得
         last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
-        last_col = worksheet.Cells(1, worksheet.Columns.Count).End(-4159).Column
 
         # ソート対象の範囲を設定
         sort_range = worksheet.Range(f"A2:I{last_row}")
@@ -193,12 +192,15 @@ def sort_excel_data(worksheet):
             Order2=1,  # 1=昇順
             Key3=worksheet.Range("B2"),  # B列（患者ID）
             Order3=1,  # 1=昇順
+            Key4=worksheet.Range("F2"),  # F列（医師名）
+            Order4=1,  # 1=昇順
+            Key5=worksheet.Range("D2"),  # D列（文章名）
+            Order5=1,  # 1=昇順
             Header=1,  # 1=ヘッダーあり
             OrderCustom=1,
             MatchCase=False,
             Orientation=1)
 
-        print("データのソートが完了しました")
         return last_row
 
     except Exception as e:
@@ -382,6 +384,7 @@ def transfer_csv_to_excel():
             print(f"共有ボタンのクリックに失敗しました: {str(e)}")
         finally:
             # 操作が終わったらExcelは開いたままにする
+            excel.WindowState = -4140  # xlNormal
             excel = None
 
     except Exception as e:
