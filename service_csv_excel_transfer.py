@@ -175,6 +175,46 @@ def process_completed_csv(csv_path: str) -> None:
         print(f"CSVファイルの処理中にエラーが発生しました: {str(e)}")
         raise
 
+
+def sort_excel_data(worksheet):
+    try:
+        # 最終行と最終列を取得
+        last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
+        last_col = worksheet.Cells(1, worksheet.Columns.Count).End(-4159).Column
+
+        # ソート対象の範囲を設定
+        sort_range = worksheet.Range(f"A2:I{last_row}")
+
+        # ソートの実行
+        sort_range.Sort(
+            Key1=worksheet.Range("A2"),  # A列（預り日）
+            Order1=1,  # 1=昇順
+            Key2=worksheet.Range("E2"),  # E列（診療科）
+            Order2=1,  # 1=昇順
+            Key3=worksheet.Range("B2"),  # B列（患者ID）
+            Order3=1,  # 1=昇順
+            Header=1,  # 1=ヘッダーあり
+            OrderCustom=1,
+            MatchCase=False,
+            Orientation=1)
+
+        print("データのソートが完了しました")
+        return last_row
+
+    except Exception as e:
+        print(f"ソート中にエラーが発生しました: {str(e)}")
+        raise
+
+def bring_excel_to_front():
+    # Excelのメインウィンドウのハンドルを取得（最大3回まで試行）
+    for _ in range(2):
+        hwnd = win32gui.FindWindow("XLMAIN", None)
+        if hwnd:
+            win32gui.SetForegroundWindow(hwnd)
+            return True
+        time.sleep(0.1)  # 少し待機
+    return False
+
 def transfer_csv_to_excel():
     try:
         config = ConfigManager()
@@ -320,16 +360,6 @@ def transfer_csv_to_excel():
 
         process_completed_csv(latest_csv)
 
-        def bring_excel_to_front():
-            # Excelのメインウィンドウのハンドルを取得（最大3回まで試行）
-            for _ in range(2):
-                hwnd = win32gui.FindWindow("XLMAIN", None)
-                if hwnd:
-                    win32gui.SetForegroundWindow(hwnd)
-                    return True
-                time.sleep(0.1)  # 少し待機
-            return False
-
         excel_path_str = str(Path(excel_path).resolve())
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True
@@ -340,13 +370,11 @@ def transfer_csv_to_excel():
 
         try:
             worksheet = workbook.ActiveSheet
-            last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row  # xlUp = -4162
+            sort_excel_data(worksheet) # データをソートして最終行を取得
             worksheet.Cells(last_row, 1).Select()
 
             wait_time = config.get_share_button_wait_time()
             time.sleep(wait_time)
-
-            # 共有ボタンのクリック
             share_x, share_y = config.get_share_button_position()
             pyautogui.click(share_x, share_y)
 
