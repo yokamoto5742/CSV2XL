@@ -11,7 +11,7 @@ from PyQt6.QtGui import QIntValidator
 from PyQt6.QtCore import Qt, QTimer
 from config_manager import ConfigManager
 from service_csv_excel_transfer import transfer_csv_to_excel
-from coordinate_tracker import CoordinateTracker
+from service_coordinate_tracker import CoordinateTracker
 from version import VERSION
 
 
