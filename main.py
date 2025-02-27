@@ -1,6 +1,5 @@
 import sys
-from app_window import MainWindow, QApplication
-from service_csv_excel_transfer import transfer_csv_to_excel
+from app_main_window import MainWindow, QApplication
 from version import VERSION, LAST_UPDATED
 
 
