@@ -18,17 +18,14 @@ class ExcludeDocsDialog(QDialog):
 
         layout = QVBoxLayout()
 
-        # 文書名入力フィールド
         self.input_field = QLineEdit()
         layout.addWidget(QLabel("除外する文書名を入力:"))
         layout.addWidget(self.input_field)
 
-        # 登録済み文書名リスト
         self.doc_list = QListWidget()
         layout.addWidget(QLabel("登録済み文書名:"))
         layout.addWidget(self.doc_list)
 
-        # ボタン
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel
@@ -36,11 +33,9 @@ class ExcludeDocsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
-        # 追加ボタン
         add_button = QPushButton("追加")
         add_button.clicked.connect(self.add_document)
 
-        # 削除ボタン
         delete_button = QPushButton("削除")
         delete_button.clicked.connect(self.delete_selected)
 
@@ -50,7 +45,6 @@ class ExcludeDocsDialog(QDialog):
 
         self.setLayout(layout)
 
-        # 設定の読み込み
         self.config = ConfigManager()
         self.load_documents()
 
@@ -73,7 +67,6 @@ class ExcludeDocsDialog(QDialog):
             self.doc_list.takeItem(self.doc_list.row(current_item))
 
     def accept(self):
-        # 設定の保存
         docs = []
         for i in range(self.doc_list.count()):
             docs.append(self.doc_list.item(i).text())
@@ -93,17 +86,14 @@ class ExcludeDoctorsDialog(QDialog):
 
         layout = QVBoxLayout()
 
-        # 医師名入力フィールド
         self.input_field = QLineEdit()
         layout.addWidget(QLabel("除外する医師名を入力:"))
         layout.addWidget(self.input_field)
 
-        # 登録済み医師名リスト
         self.doc_list = QListWidget()
         layout.addWidget(QLabel("登録済み医師名:"))
         layout.addWidget(self.doc_list)
 
-        # ボタン
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel
@@ -111,11 +101,9 @@ class ExcludeDoctorsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
-        # 追加ボタン
         add_button = QPushButton("追加")
         add_button.clicked.connect(self.add_doctor)
 
-        # 削除ボタン
         delete_button = QPushButton("削除")
         delete_button.clicked.connect(self.delete_selected)
 
@@ -125,7 +113,6 @@ class ExcludeDoctorsDialog(QDialog):
 
         self.setLayout(layout)
 
-        # 設定の読み込み
         self.config = ConfigManager()
         self.load_doctors()
 
@@ -148,7 +135,6 @@ class ExcludeDoctorsDialog(QDialog):
             self.doc_list.takeItem(self.doc_list.row(current_item))
 
     def accept(self):
-        # 設定の保存
         docs = []
         for i in range(self.doc_list.count()):
             docs.append(self.doc_list.item(i).text())
