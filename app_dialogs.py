@@ -151,8 +151,7 @@ class FolderPathDialog(QDialog):
         layout.addLayout(path_layout)
         return path_field
 
-    def open_folder(self, path: str) -> None:
-        """指定されたパスのフォルダをエクスプローラーで開く"""
+    def open_folder(self, path: str):
         if path and os.path.exists(path):
             os.startfile(path)
         else:
@@ -186,7 +185,6 @@ class FolderPathDialog(QDialog):
                 self.excel_path.setText(file)
 
     def accept(self):
-        # 設定の保存
         self.config.set_downloads_path(self.downloads_path.text())
         self.config.set_excel_path(self.excel_path.text())
         self.config.set_backup_path(self.backup_path.text())
@@ -201,13 +199,11 @@ class AppearanceDialog(QDialog):
 
         layout = QVBoxLayout()
 
-        # フォントサイズ設定
         layout.addWidget(QLabel("フォントサイズ:"))
         self.font_size_input = QLineEdit()
         self.font_size_input.setValidator(QIntValidator(6, 72))
         layout.addWidget(self.font_size_input)
 
-        # ウィンドウサイズ設定
         layout.addWidget(QLabel("ウィンドウの幅:"))
         self.window_width_input = QLineEdit()
         self.window_width_input.setValidator(QIntValidator(200, 1000))
@@ -218,7 +214,6 @@ class AppearanceDialog(QDialog):
         self.window_height_input.setValidator(QIntValidator(150, 800))
         layout.addWidget(self.window_height_input)
 
-        # ボタン
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel
@@ -229,7 +224,6 @@ class AppearanceDialog(QDialog):
 
         self.setLayout(layout)
 
-        # 設定の読み込み
         self.config = ConfigManager()
         self.load_settings()
 
@@ -240,7 +234,6 @@ class AppearanceDialog(QDialog):
         self.window_height_input.setText(str(window_size[1]))
 
     def accept(self):
-        # 設定の保存
         self.config.set_font_size(int(self.font_size_input.text()))
         self.config.set_window_size(
             int(self.window_width_input.text()),
