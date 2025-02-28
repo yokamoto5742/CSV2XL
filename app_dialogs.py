@@ -10,21 +10,22 @@ from PyQt6.QtGui import QIntValidator
 from config_manager import ConfigManager
 
 
-class ExcludeDocsDialog(QDialog):
-    def __init__(self, parent=None):
+class ExcludeItemDialog(QDialog):
+    def __init__(self, title, item_label, config_section, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("除外する文書名")
+        self.setWindowTitle(title)
         self.setModal(True)
+        self.config_section = config_section
 
         layout = QVBoxLayout()
 
         self.input_field = QLineEdit()
-        layout.addWidget(QLabel("除外する文書名を入力:"))
+        layout.addWidget(QLabel(f"{item_label}を入力:"))
         layout.addWidget(self.input_field)
 
-        self.doc_list = QListWidget()
-        layout.addWidget(QLabel("登録済み文書名:"))
-        layout.addWidget(self.doc_list)
+        self.item_list = QListWidget()
+        layout.addWidget(QLabel(f"登録済み{item_label}:"))
+        layout.addWidget(self.item_list)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
@@ -34,7 +35,7 @@ class ExcludeDocsDialog(QDialog):
         buttons.rejected.connect(self.reject)
 
         add_button = QPushButton("追加")
-        add_button.clicked.connect(self.add_document)
+        add_button.clicked.connect(self.add_item)
 
         delete_button = QPushButton("削除")
         delete_button.clicked.connect(self.delete_selected)
@@ -46,104 +47,46 @@ class ExcludeDocsDialog(QDialog):
         self.setLayout(layout)
 
         self.config = ConfigManager()
-        self.load_documents()
+        self.load_items()
 
-    def load_documents(self):
-        if 'ExcludeDocs' in self.config.config:
-            docs = self.config.config['ExcludeDocs'].get('list', '').split(',')
-            for doc in docs:
-                if doc.strip():
-                    self.doc_list.addItem(doc.strip())
+    def load_items(self):
+        if self.config_section in self.config.config:
+            items = self.config.config[self.config_section].get('list', '').split(',')
+            for item in items:
+                if item.strip():
+                    self.item_list.addItem(item.strip())
 
-    def add_document(self):
-        doc_name = self.input_field.text().strip()
-        if doc_name:
-            self.doc_list.addItem(doc_name)
+    def add_item(self):
+        item_name = self.input_field.text().strip()
+        if item_name:
+            self.item_list.addItem(item_name)
             self.input_field.clear()
 
     def delete_selected(self):
-        current_item = self.doc_list.currentItem()
+        current_item = self.item_list.currentItem()
         if current_item:
-            self.doc_list.takeItem(self.doc_list.row(current_item))
+            self.item_list.takeItem(self.item_list.row(current_item))
 
     def accept(self):
-        docs = []
-        for i in range(self.doc_list.count()):
-            docs.append(self.doc_list.item(i).text())
+        items = []
+        for i in range(self.item_list.count()):
+            items.append(self.item_list.item(i).text())
 
-        if 'ExcludeDocs' not in self.config.config:
-            self.config.config['ExcludeDocs'] = {}
-        self.config.config['ExcludeDocs']['list'] = ','.join(docs)
+        if self.config_section not in self.config.config:
+            self.config.config[self.config_section] = {}
+        self.config.config[self.config_section]['list'] = ','.join(items)
         self.config.save_config()
         super().accept()
 
 
-class ExcludeDoctorsDialog(QDialog):
+class ExcludeDocsDialog(ExcludeItemDialog):
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("除外する医師名")
-        self.setModal(True)
+        super().__init__("除外する文書名", "除外する文書名", "ExcludeDocs", parent)
 
-        layout = QVBoxLayout()
 
-        self.input_field = QLineEdit()
-        layout.addWidget(QLabel("除外する医師名を入力:"))
-        layout.addWidget(self.input_field)
-
-        self.doc_list = QListWidget()
-        layout.addWidget(QLabel("登録済み医師名:"))
-        layout.addWidget(self.doc_list)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok |
-            QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-
-        add_button = QPushButton("追加")
-        add_button.clicked.connect(self.add_doctor)
-
-        delete_button = QPushButton("削除")
-        delete_button.clicked.connect(self.delete_selected)
-
-        layout.addWidget(add_button)
-        layout.addWidget(delete_button)
-        layout.addWidget(buttons)
-
-        self.setLayout(layout)
-
-        self.config = ConfigManager()
-        self.load_doctors()
-
-    def load_doctors(self):
-        if 'ExcludeDoctors' in self.config.config:
-            docs = self.config.config['ExcludeDoctors'].get('list', '').split(',')
-            for doc in docs:
-                if doc.strip():
-                    self.doc_list.addItem(doc.strip())
-
-    def add_doctor(self):
-        doc_name = self.input_field.text().strip()
-        if doc_name:
-            self.doc_list.addItem(doc_name)
-            self.input_field.clear()
-
-    def delete_selected(self):
-        current_item = self.doc_list.currentItem()
-        if current_item:
-            self.doc_list.takeItem(self.doc_list.row(current_item))
-
-    def accept(self):
-        docs = []
-        for i in range(self.doc_list.count()):
-            docs.append(self.doc_list.item(i).text())
-
-        if 'ExcludeDoctors' not in self.config.config:
-            self.config.config['ExcludeDoctors'] = {}
-        self.config.config['ExcludeDoctors']['list'] = ','.join(docs)
-        self.config.save_config()
-        super().accept()
+class ExcludeDoctorsDialog(ExcludeItemDialog):
+    def __init__(self, parent=None):
+        super().__init__("除外する医師名", "除外する医師名", "ExcludeDoctors", parent)
 
 
 class FolderPathDialog(QDialog):
