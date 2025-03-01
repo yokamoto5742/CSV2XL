@@ -1,14 +1,15 @@
 import os
 import sys
 from pathlib import Path
+
+from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QLineEdit, QListWidget, QDialogButtonBox, QFileDialog,
     QMessageBox
 )
-from PyQt6.QtGui import QIntValidator
-from config_manager import ConfigManager
 
+from config_manager import ConfigManager
 
 class ExcludeItemDialog(QDialog):
     def __init__(self, title, item_label, config_section, parent=None):

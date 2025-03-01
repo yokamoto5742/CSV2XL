@@ -1,17 +1,18 @@
 import os
 import sys
 from pathlib import Path
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QPushButton, QLabel, QMessageBox
 )
-from PyQt6.QtGui import QIntValidator
-from PyQt6.QtCore import Qt
 
-from config_manager import ConfigManager
-from service_csv_excel_transfer import transfer_csv_to_excel
-from service_coordinate_tracker import CoordinateTracker
 from app_dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, AppearanceDialog, FolderPathDialog
+from config_manager import ConfigManager
+from service_coordinate_tracker import CoordinateTracker
+from service_csv_excel_transfer import transfer_csv_to_excel
 from version import VERSION
 
 

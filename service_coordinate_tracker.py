@@ -1,8 +1,8 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel
+import pyautogui
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QShortcut, QKeySequence
-import pyautogui
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel
 
 
 class CoordinateTracker(QMainWindow):
