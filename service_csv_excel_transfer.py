@@ -12,7 +12,7 @@ from service_csv_processor import (
     process_completed_csv
 )
 from service_excel_processor import write_data_to_excel, open_and_sort_excel
-from service_file_manager import backup_excel_file, cleanup_old_files, ensure_directories_exist
+from service_file_manager import backup_excel_file, cleanup_old_csv_files, ensure_directories_exist
 
 
 
@@ -25,7 +25,7 @@ def transfer_csv_to_excel():
 
         ensure_directories_exist()
 
-        cleanup_old_files(processed_dir)
+        cleanup_old_csv_files(processed_dir)
 
         latest_csv = find_latest_csv(downloads_path)
         if not latest_csv:

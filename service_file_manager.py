@@ -16,28 +16,24 @@ def backup_excel_file(excel_path):
     backup_path = backup_dir / f"backup_{Path(excel_path).name}"
 
     try:
-        # ファイルをコピー（既存のファイルは上書き）
         shutil.copy2(excel_path, backup_path)
-        print(f"バックアップを作成しました: {backup_path}")
     except Exception as e:
         print(f"バックアップ作成中にエラーが発生しました: {str(e)}")
         raise
 
 
-def cleanup_old_files(processed_dir: Path):
+def cleanup_old_csv_files(processed_dir: Path):
     current_time = datetime.datetime.now()
     for file in processed_dir.glob("*.csv"):
         file_time = datetime.datetime.fromtimestamp(file.stat().st_mtime)
         if (current_time - file_time).days >= 3:
             try:
                 file.unlink()
-                print(f"古いファイルを削除しました: {file}")
             except Exception as e:
                 print(f"ファイル削除中にエラーが発生しました: {file} - {str(e)}")
 
 
 def ensure_directories_exist():
-    """必要なディレクトリが存在することを確認する"""
     config = ConfigManager()
     directories = [
         Path(config.get_downloads_path()),
@@ -49,7 +45,6 @@ def ensure_directories_exist():
         if not directory.exists():
             try:
                 directory.mkdir(parents=True, exist_ok=True)
-                print(f"ディレクトリを作成しました: {directory}")
             except Exception as e:
                 print(f"ディレクトリの作成中にエラーが発生しました: {directory} - {str(e)}")
                 raise
