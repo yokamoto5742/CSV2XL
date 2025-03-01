@@ -28,13 +28,11 @@ def apply_cell_formats(worksheet, start_row):
 
     # A列からF列までの範囲を設定
     for row in range(start_row, last_row + 1):
-        for col in range(1, 7):  # A=1, F=6
+        for col in range(1, 7):
             cell = worksheet.cell(row=row, column=col)
 
-            # 縦位置を中央に設定（A-F列）
             cell.alignment = Alignment(vertical='center')
 
-            # 横位置を設定
             if col in [1, 2, 5, 6]:  # A,B列とE,F列
                 cell.alignment = Alignment(horizontal='center')
 
@@ -44,13 +42,11 @@ def apply_cell_formats(worksheet, start_row):
 
 def sort_excel_data(worksheet):
     try:
-        # 最終行を取得
         last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
 
-        # ソート対象の範囲を設定
+        # ソートの範囲を設定
         sort_range = worksheet.Range(f"A2:I{last_row}")
 
-        # ソートの実行
         sort_range.Sort(
             Key1=worksheet.Range("A2"),  # A列（預り日）
             Order1=1,  # 1=昇順
@@ -71,19 +67,19 @@ def sort_excel_data(worksheet):
 
 
 def bring_excel_to_front():
-    # Excelのメインウィンドウのハンドルを取得（最大3回まで試行）
+    # Excelの表示を最前面にする（最大3回まで試行）
     for _ in range(2):
         hwnd = win32gui.FindWindow("XLMAIN", None)
         if hwnd:
             win32gui.SetForegroundWindow(hwnd)
             return True
-        time.sleep(0.1)  # 少し待機
+        time.sleep(0.1)
     return False
 
 
 def write_data_to_excel(excel_path, df):
     if not os.path.exists(excel_path) or not excel_path.endswith('.xlsm'):
-        print(f"マクロ付きExcelファイル(.xlsm)が見つかりません: {excel_path}")
+        print(f"Excelファイルが見つかりません: {excel_path}")
         return False
 
     try:
@@ -91,7 +87,7 @@ def write_data_to_excel(excel_path, df):
     except PermissionError:
         QMessageBox.critical(None,
                             "エラー",
-                            "Excelファイルが別のプロセスで開かれています。\nExcelファイルを閉じてから再度実行してください。"
+                            "Excelファイルが別のプロセスで開かれています。\nファイルを閉じてから再度実行してください。"
                             )
         return False
     
@@ -137,14 +133,14 @@ def write_data_to_excel(excel_path, df):
                 # YYYY-MM-DD形式をYYYYMMDD形式に変換
                 date_obj = datetime.datetime.strptime(csv_date, '%Y-%m-%d')
                 date_str = date_obj.strftime('%Y%m%d')
-            except:
+            except ValueError:
                 date_str = csv_date
         else:
             date_str = str(csv_date)
 
         # 比較用のタプルを作成
         row_data = (
-            date_str,  # 日付を8桁の数値文字列として保持
+            date_str,
             str(row[1] or ''),
             str(row[2] or ''),
             str(row[3] or ''),
@@ -155,7 +151,7 @@ def write_data_to_excel(excel_path, df):
         if row_data not in existing_data:
             unique_data.append(row)
 
-    # 重複しないデータのみを書き込み
+    # 重複しないデータのみを書き込む
     for i, row in enumerate(unique_data):
         for j, value in enumerate(row):
             cell = ws.cell(row=last_row + 1 + i, column=j + 1)
@@ -165,13 +161,13 @@ def write_data_to_excel(excel_path, df):
                     date_value = datetime.datetime.strptime(value, '%Y-%m-%d')
                     cell.value = date_value
                     cell.number_format = 'yyyy/mm/dd'
-                except:
+                except valueError:
                     cell.value = value
             elif j == 1:  # 患者ID列
                 try:
                     cell.value = int(value.replace(',', ''))
                     cell.number_format = '0'
-                except:
+                except ValueError:
                     cell.value = value
             else:
                 cell.value = value if value is not None else ""
@@ -185,7 +181,7 @@ def write_data_to_excel(excel_path, df):
     except PermissionError:
         QMessageBox.critical(None,
                             "エラー",
-                            "Excelファイルが別のプロセスで開かれているため、保存できません。\nExcelファイルを閉じてから再度実行してください。"
+                            "Excelファイルが別のプロセスで開かれているため、保存できません。\nファイルを閉じてから再度実行してください。"
                             )
         if 'wb' in locals():
             wb.close()
@@ -196,7 +192,7 @@ def open_and_sort_excel(excel_path):
     excel_path_str = str(Path(excel_path).resolve())
     excel = win32com.client.Dispatch("Excel.Application")
     excel.Visible = True
-    bring_excel_to_front()  # すぐに最前面に表示
+    bring_excel_to_front()  # 最前面に表示
     workbook = excel.Workbooks.Open(excel_path_str)
     excel.WindowState = -4137  # xlMaximized
     workbook.Windows(1).Activate()
@@ -205,7 +201,7 @@ def open_and_sort_excel(excel_path):
         worksheet = workbook.ActiveSheet
         sort_excel_data(worksheet)
 
-        last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row  # xlUp = -4162
+        last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row  # データが存在する最後の行を特定する
         worksheet.Cells(last_row, 1).Select()
 
         config = ConfigManager()
@@ -219,4 +215,3 @@ def open_and_sort_excel(excel_path):
     finally:
         # 操作が終わったらExcelは開いたままにする
         pyautogui.hotkey('win', 'down')  # ウィンドウを最小化
-        excel = None
