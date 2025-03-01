@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QIntValidator
 from PyQt6.QtCore import Qt
+
 from config_manager import ConfigManager
 from service_csv_excel_transfer import transfer_csv_to_excel
 from service_coordinate_tracker import CoordinateTracker
@@ -17,8 +18,8 @@ from version import VERSION
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.tracker = CoordinateTracker()
         self.config = ConfigManager()
+        self.tracker = CoordinateTracker()
         font = self.font()
         font.setPointSize(self.config.get_font_size())
         self.setFont(font)
@@ -30,16 +31,13 @@ class MainWindow(QMainWindow):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
 
-        # レイアウト
         layout = QVBoxLayout()
 
         self.setStyleSheet("QMainWindow { border: 5px solid darkgreen; }")
 
-        # タイトル
         title_label = QLabel("Papyrus書類受付リスト")
         layout.addWidget(title_label)
 
-        # CSVファイル取り込みボタン
         csv_button = QPushButton("CSVファイル取り込み")
         csv_button.setStyleSheet("""
             QPushButton {
