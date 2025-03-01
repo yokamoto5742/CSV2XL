@@ -1,4 +1,5 @@
 import sys
+
 from app_main_window import MainWindow, QApplication
 from version import VERSION, LAST_UPDATED
 
