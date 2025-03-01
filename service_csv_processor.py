@@ -40,7 +40,6 @@ def read_csv_with_encoding(file_path):
 
 def process_csv_data(df):
     try:
-        print("処理前の列名:", df.columns)
         # 列名を一意にする
         original_columns = df.columns
         unique_columns = []
@@ -82,10 +81,8 @@ def process_csv_data(df):
                 pl.col(df.columns[5]).str.replace_all(r'[\s*]', '')  # F列
             ])
 
-            print("処理後の列名:", df.columns)
             return df
 
-        print("処理後の列名:", df.columns)
         return df
 
     except Exception as e:
@@ -106,11 +103,10 @@ def convert_date_format(df):
         return df
 
 
-def process_completed_csv(csv_path: str) -> None:
+def process_completed_csv(csv_path: str):
     try:
         csv_file = Path(csv_path)
         if not csv_file.exists():
-            print(f"処理対象のCSVファイルが見つかりません: {csv_path}")
             return
 
         config = ConfigManager()
@@ -119,7 +115,6 @@ def process_completed_csv(csv_path: str) -> None:
 
         new_path = processed_dir / csv_file.name
         shutil.move(str(csv_file), str(new_path))
-        print(f"CSVファイルを移動しました: {new_path}")
 
     except Exception as e:
         print(f"CSVファイルの処理中にエラーが発生しました: {str(e)}")
@@ -127,7 +122,7 @@ def process_completed_csv(csv_path: str) -> None:
 
 
 def find_latest_csv(downloads_path):
-    # CSVファイルの検索
+    # ファイル名の形式がYYYYMMDD_HHmmss.csvのファイルを検索
     csv_files = [f for f in Path(downloads_path).glob('*.csv')
                 if len(f.name.split('_')) == 2 and
                 (3 <= len(f.name.split('_')[0]) <= 4) and
@@ -135,6 +130,5 @@ def find_latest_csv(downloads_path):
     
     if not csv_files:
         return None
-    
-    # 最新のCSVファイルを返す
+
     return str(max(csv_files, key=lambda f: f.stat().st_mtime))
