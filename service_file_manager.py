@@ -13,7 +13,7 @@ def backup_excel_file(excel_path):
     if not backup_dir.exists():
         backup_dir.mkdir(parents=True)
 
-    backup_path = backup_dir / Path(excel_path).name
+    backup_path = backup_dir / f"backup_{Path(excel_path).name}"
 
     try:
         shutil.copy2(excel_path, backup_path)
