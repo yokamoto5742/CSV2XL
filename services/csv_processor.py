@@ -4,7 +4,7 @@ from pathlib import Path
 
 import polars as pl
 
-from config_manager import ConfigManager
+from utils.config_manager import ConfigManager
 
 
 def read_csv_with_encoding(file_path):

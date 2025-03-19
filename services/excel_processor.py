@@ -11,7 +11,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 from PyQt6.QtWidgets import QMessageBox
 
-from config_manager import ConfigManager
+from utils.config_manager import ConfigManager
 
 
 def get_last_row(worksheet):

@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QMessageBox
 )
 
-from config_manager import ConfigManager
+from utils.config_manager import ConfigManager
 
 class ExcludeItemDialog(QDialog):
     def __init__(self, title, item_label, config_section, parent=None):

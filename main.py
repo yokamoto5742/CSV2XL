@@ -1,7 +1,7 @@
 import sys
 
-from app_main_window import MainWindow, QApplication
-from version import VERSION, LAST_UPDATED
+from ui.main_window import MainWindow, QApplication
+from utils.version import VERSION, LAST_UPDATED
 
 
 if __name__ == "__main__":

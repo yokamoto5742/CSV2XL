@@ -9,11 +9,11 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QMessageBox
 )
 
-from dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, AppearanceDialog, FolderPathDialog
-from config_manager import ConfigManager
-from service_coordinate_tracker import CoordinateTracker
-from service_csv_excel_transfer import transfer_csv_to_excel
-from version import VERSION
+from ui.dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, AppearanceDialog, FolderPathDialog
+from utils.config_manager import ConfigManager
+from services.coordinate_tracker import CoordinateTracker
+from services.csv_excel_transfer import transfer_csv_to_excel
+from utils.version import VERSION
 
 
 class MainWindow(QMainWindow):
