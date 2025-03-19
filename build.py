@@ -1,5 +1,5 @@
 import subprocess
-from utils.version_manager import update_version, update_version_py
+from version_manager import update_version, update_version_py
 
 
 def build_executable():
@@ -11,7 +11,7 @@ def build_executable():
         "--name=CSV2XL",
         "--windowed",
         "--icon=assets/CSV2XL.ico",
-        "--add-data", "config.ini;.",
+        "--add-data", "utils/config.ini;.",
         "main.py"
     ])
 

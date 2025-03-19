@@ -9,8 +9,8 @@ from PyQt6.QtWidgets import QApplication, QDialogButtonBox, QMessageBox, QDialog
 from PyQt6.QtTest import QTest
 from PyQt6.QtCore import Qt
 
-from app_dialogs import ExcludeItemDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, AppearanceDialog
-from config_manager import ConfigManager, CONFIG_PATH
+from ui.dialogs import ExcludeItemDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, AppearanceDialog
+from utils.config_manager import ConfigManager, CONFIG_PATH
 
 
 def restore_config(config, original_config):
