@@ -1,5 +1,5 @@
 import subprocess
-from version_manager import update_version, update_version_py
+from utils.version_manager import update_version, update_version_py
 
 
 def build_executable():

@@ -4,15 +4,15 @@ from pathlib import Path
 from PyQt6.QtWidgets import QMessageBox
 
 from config_manager import ConfigManager
-from service_csv_processor import (
+from csv_processor import (
     find_latest_csv,
     read_csv_with_encoding,
     process_csv_data,
     convert_date_format,
     process_completed_csv
 )
-from service_excel_processor import write_data_to_excel, open_and_sort_excel
-from service_file_manager import backup_excel_file, cleanup_old_csv_files, ensure_directories_exist
+from excel_processor import write_data_to_excel, open_and_sort_excel
+from file_manager import backup_excel_file, cleanup_old_csv_files, ensure_directories_exist
 
 
 

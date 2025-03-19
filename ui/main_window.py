@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QMessageBox
 )
 
-from app_dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, AppearanceDialog, FolderPathDialog
+from dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, AppearanceDialog, FolderPathDialog
 from config_manager import ConfigManager
 from service_coordinate_tracker import CoordinateTracker
 from service_csv_excel_transfer import transfer_csv_to_excel
