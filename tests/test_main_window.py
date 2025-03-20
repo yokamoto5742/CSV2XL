@@ -9,9 +9,9 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PyQt6.QtTest import QTest
 from PyQt6.QtCore import Qt
 
-from app_main_window import MainWindow
-from config_manager import ConfigManager, CONFIG_PATH
-from version import VERSION
+from ui.main_window import MainWindow
+from utils.config_manager import ConfigManager, CONFIG_PATH
+from utils.version import VERSION
 
 
 def restore_config(config, original_config):
@@ -85,7 +85,7 @@ class TestMainWindow:
         # (タイトルラベル、CSVボタン、設定ラベル、除外文書ボタン、除外医師ボタン、外観ボタン、座標ボタン、フォルダボタン、閉じるボタン)
         assert layout.count() >= 9
 
-    @patch('app_main_window.transfer_csv_to_excel')
+    @patch('ui.main_window.transfer_csv_to_excel')
     def test_import_csv_success(self, mock_transfer, app, backup_config):
         """CSVインポート成功のテスト"""
         window = MainWindow()
@@ -95,8 +95,8 @@ class TestMainWindow:
         # transfer_csv_to_excel関数が呼ばれたことを確認
         mock_transfer.assert_called_once()
 
-    @patch('app_main_window.transfer_csv_to_excel')
-    @patch('app_main_window.QMessageBox.critical')
+    @patch('ui.main_window.transfer_csv_to_excel')
+    @patch('ui.main_window.QMessageBox.critical')
     def test_import_csv_error(self, mock_critical, mock_transfer, app, backup_config):
         """CSVインポートエラーのテスト"""
         # エラーをシミュレート
@@ -112,7 +112,7 @@ class TestMainWindow:
         assert args[1] == "エラー"  # タイトル
         assert "テストエラー" in args[2]  # エラーメッセージ
 
-    @patch('app_main_window.ExcludeDocsDialog')
+    @patch('ui.main_window.ExcludeDocsDialog')
     def test_show_exclude_docs_dialog(self, mock_dialog, app, backup_config):
         """除外文書ダイアログ表示テスト"""
         mock_instance = MagicMock()
@@ -125,7 +125,7 @@ class TestMainWindow:
         mock_dialog.assert_called_once_with(window)
         mock_instance.exec.assert_called_once()
 
-    @patch('app_main_window.ExcludeDoctorsDialog')
+    @patch('ui.main_window.ExcludeDoctorsDialog')
     def test_show_exclude_doctors_dialog(self, mock_dialog, app, backup_config):
         """除外医師ダイアログ表示テスト"""
         mock_instance = MagicMock()
@@ -138,7 +138,7 @@ class TestMainWindow:
         mock_dialog.assert_called_once_with(window)
         mock_instance.exec.assert_called_once()
 
-    @patch('app_main_window.AppearanceDialog')
+    @patch('ui.main_window.AppearanceDialog')
     def test_show_appearance_dialog(self, mock_dialog, app, backup_config):
         """外観設定ダイアログ表示テスト"""
         mock_instance = MagicMock()
@@ -151,7 +151,7 @@ class TestMainWindow:
         mock_dialog.assert_called_once_with(window)
         mock_instance.exec.assert_called_once()
 
-    @patch('app_main_window.FolderPathDialog')
+    @patch('ui.main_window.FolderPathDialog')
     def test_show_folder_path_dialog(self, mock_dialog, app, backup_config):
         """フォルダパスダイアログ表示テスト"""
         mock_instance = MagicMock()
@@ -180,7 +180,7 @@ class TestMainWindow:
         # showメソッドが呼ばれたことを確認
         tracker.show.assert_called_once()
 
-    @patch('app_main_window.QMainWindow.close')
+    @patch('ui.main_window.QMainWindow.close')
     def test_close_button(self, mock_close, app, backup_config):
         """閉じるボタンのテスト"""
         window = MainWindow()

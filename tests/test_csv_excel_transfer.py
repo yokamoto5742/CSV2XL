@@ -5,8 +5,8 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
-from service_csv_excel_transfer import transfer_csv_to_excel
-from config_manager import ConfigManager
+from services.csv_excel_transfer import transfer_csv_to_excel
+from utils.config_manager import ConfigManager
 
 
 @pytest.fixture
@@ -19,17 +19,17 @@ def app():
 
 
 class TestCsvExcelTransfer:
-    @patch('service_csv_excel_transfer.ConfigManager')
-    @patch('service_csv_excel_transfer.ensure_directories_exist')
-    @patch('service_csv_excel_transfer.cleanup_old_csv_files')
-    @patch('service_csv_excel_transfer.find_latest_csv')
-    @patch('service_csv_excel_transfer.read_csv_with_encoding')
-    @patch('service_csv_excel_transfer.convert_date_format')
-    @patch('service_csv_excel_transfer.process_csv_data')
-    @patch('service_csv_excel_transfer.write_data_to_excel')
-    @patch('service_csv_excel_transfer.backup_excel_file')
-    @patch('service_csv_excel_transfer.process_completed_csv')
-    @patch('service_csv_excel_transfer.open_and_sort_excel')
+    @patch('services.csv_excel_transfer.ConfigManager')
+    @patch('services.csv_excel_transfer.ensure_directories_exist')
+    @patch('services.csv_excel_transfer.cleanup_old_csv_files')
+    @patch('services.csv_excel_transfer.find_latest_csv')
+    @patch('services.csv_excel_transfer.read_csv_with_encoding')
+    @patch('services.csv_excel_transfer.convert_date_format')
+    @patch('services.csv_excel_transfer.process_csv_data')
+    @patch('services.csv_excel_transfer.write_data_to_excel')
+    @patch('services.csv_excel_transfer.backup_excel_file')
+    @patch('services.csv_excel_transfer.process_completed_csv')
+    @patch('services.csv_excel_transfer.open_and_sort_excel')
     def test_transfer_csv_to_excel_success(self, mock_open_sort, mock_process_csv,
                                            mock_backup, mock_write, mock_process_data,
                                            mock_convert_date, mock_read_csv, mock_find_csv,
@@ -64,11 +64,11 @@ class TestCsvExcelTransfer:
         mock_process_csv.assert_called_once_with("C:/Downloads/test.csv")
         mock_open_sort.assert_called_once_with("C:/Excel/test.xlsm")
 
-    @patch('service_csv_excel_transfer.ConfigManager')
-    @patch('service_csv_excel_transfer.ensure_directories_exist')
-    @patch('service_csv_excel_transfer.cleanup_old_csv_files')
-    @patch('service_csv_excel_transfer.find_latest_csv')
-    @patch('service_csv_excel_transfer.QMessageBox.warning')
+    @patch('services.csv_excel_transfer.ConfigManager')
+    @patch('services.csv_excel_transfer.ensure_directories_exist')
+    @patch('services.csv_excel_transfer.cleanup_old_csv_files')
+    @patch('services.csv_excel_transfer.find_latest_csv')
+    @patch('services.csv_excel_transfer.QMessageBox.warning')
     def test_transfer_csv_to_excel_no_csv(self, mock_warning, mock_find_csv,
                                           mock_cleanup, mock_ensure_dirs, mock_config_manager, app):
         """CSVファイルが見つからない場合のテスト"""
@@ -91,15 +91,15 @@ class TestCsvExcelTransfer:
         assert args[1] == "警告"
         assert "CSVファイルが見つかりません" in args[2]
 
-    @patch('service_csv_excel_transfer.ConfigManager')
-    @patch('service_csv_excel_transfer.ensure_directories_exist')
-    @patch('service_csv_excel_transfer.cleanup_old_csv_files')
-    @patch('service_csv_excel_transfer.find_latest_csv')
-    @patch('service_csv_excel_transfer.read_csv_with_encoding')
-    @patch('service_csv_excel_transfer.convert_date_format')
-    @patch('service_csv_excel_transfer.process_csv_data')
-    @patch('service_csv_excel_transfer.write_data_to_excel')
-    @patch('service_csv_excel_transfer.QMessageBox.critical')
+    @patch('services.csv_excel_transfer.ConfigManager')
+    @patch('services.csv_excel_transfer.ensure_directories_exist')
+    @patch('services.csv_excel_transfer.cleanup_old_csv_files')
+    @patch('services.csv_excel_transfer.find_latest_csv')
+    @patch('services.csv_excel_transfer.read_csv_with_encoding')
+    @patch('services.csv_excel_transfer.convert_date_format')
+    @patch('services.csv_excel_transfer.process_csv_data')
+    @patch('services.csv_excel_transfer.write_data_to_excel')
+    @patch('services.csv_excel_transfer.QMessageBox.critical')
     def test_transfer_csv_to_excel_write_error(self, mock_critical, mock_write, mock_process_data,
                                                mock_convert_date, mock_read_csv, mock_find_csv,
                                                mock_cleanup, mock_ensure_dirs, mock_config_manager, app):
@@ -124,11 +124,11 @@ class TestCsvExcelTransfer:
         # バックアップや後続処理が呼ばれないことを確認
         assert not mock_critical.called
 
-    @patch('service_csv_excel_transfer.ConfigManager')
-    @patch('service_csv_excel_transfer.ensure_directories_exist')
-    @patch('service_csv_excel_transfer.cleanup_old_csv_files')
-    @patch('service_csv_excel_transfer.find_latest_csv')
-    @patch('service_csv_excel_transfer.QMessageBox.critical')
+    @patch('services.csv_excel_transfer.ConfigManager')
+    @patch('services.csv_excel_transfer.ensure_directories_exist')
+    @patch('services.csv_excel_transfer.cleanup_old_csv_files')
+    @patch('services.csv_excel_transfer.find_latest_csv')
+    @patch('services.csv_excel_transfer.QMessageBox.critical')
     def test_transfer_csv_to_excel_exception(self, mock_critical, mock_find_csv,
                                              mock_cleanup, mock_ensure_dirs, mock_config_manager, app):
         """例外発生時のテスト"""

@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QKeySequence
 
-from service_coordinate_tracker import CoordinateTracker
+from services.coordinate_tracker import CoordinateTracker
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ class TestCoordinateTracker:
         assert tracker.timer is not None
         assert tracker.timer.isActive()
 
-    @patch('service_coordinate_tracker.pyautogui.position')
+    @patch('services.coordinate_tracker.pyautogui.position')
     def test_update_coordinates(self, mock_position, app):
         """座標更新機能のテスト"""
         mock_position.return_value = (100, 200)
@@ -54,8 +54,8 @@ class TestCoordinateTracker:
         tracker.update_coordinates()
         assert tracker.coord_label.text() == "座標: (300, 400)"
 
-    @patch('service_coordinate_tracker.pyautogui.position')
-    @patch('service_coordinate_tracker.QApplication.clipboard')
+    @patch('services.coordinate_tracker.pyautogui.position')
+    @patch('services.coordinate_tracker.QApplication.clipboard')
     def test_copy_coordinates(self, mock_clipboard, mock_position, app):
         """座標コピー機能のテスト"""
         mock_position.return_value = (500, 600)
@@ -68,8 +68,8 @@ class TestCoordinateTracker:
         # クリップボードに正しい座標がコピーされたことを確認
         mock_clipboard_instance.setText.assert_called_once_with("500, 600")
 
-    @patch('service_coordinate_tracker.pyautogui.position')
-    @patch('service_coordinate_tracker.QApplication.clipboard')
+    @patch('services.coordinate_tracker.pyautogui.position')
+    @patch('services.coordinate_tracker.QApplication.clipboard')
     def test_shortcut_activation(self, mock_clipboard, mock_position, app):
         """ショートカットキー機能のテスト"""
         mock_position.return_value = (700, 800)
@@ -93,7 +93,7 @@ class TestCoordinateTracker:
         CoordinateTracker.copy_coordinates()
         mock_clipboard_instance.setText.assert_called_once_with("700, 800")
 
-    @patch('service_coordinate_tracker.QTimer')
+    @patch('services.coordinate_tracker.QTimer')
     def test_timer_setup(self, mock_timer, app):
         """タイマー設定のテスト"""
         mock_timer_instance = MagicMock()

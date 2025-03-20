@@ -8,7 +8,7 @@ import openpyxl
 from openpyxl.styles import Alignment
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
-from service_excel_processor import (
+from services.excel_processor import (
     get_last_row, apply_cell_formats, sort_excel_data,
     bring_excel_to_front, write_data_to_excel, open_and_sort_excel
 )
@@ -69,7 +69,7 @@ class TestExcelProcessor:
         start_row = 2
 
         # get_last_rowをモック
-        with patch('service_excel_processor.get_last_row', return_value=3):
+        with patch('services.excel_processor.get_last_row', return_value=3):
             apply_cell_formats(mock_worksheet, start_row)
 
         # セルにアクセスとフォーマット適用が行われたことを確認
@@ -80,9 +80,9 @@ class TestExcelProcessor:
             for col in range(1, 7):  # A列からF列まで
                 mock_worksheet.cell.assert_any_call(row=row, column=col)
 
-    @patch('service_excel_processor.win32gui.FindWindow')
-    @patch('service_excel_processor.win32gui.SetForegroundWindow')
-    @patch('service_excel_processor.time.sleep')
+    @patch('services.excel_processor.win32gui.FindWindow')
+    @patch('services.excel_processor.win32gui.SetForegroundWindow')
+    @patch('services.excel_processor.time.sleep')
     def test_bring_excel_to_front_success(self, mock_sleep, mock_set_foreground, mock_find_window):
         """bring_excel_to_front関数の成功ケースのテスト"""
         # Excelウィンドウが見つかる場合
@@ -97,9 +97,9 @@ class TestExcelProcessor:
         mock_set_foreground.assert_called_once_with(12345)
         assert mock_sleep.called is False  # 成功した場合はsleepは呼ばれない
 
-    @patch('service_excel_processor.win32gui.FindWindow')
-    @patch('service_excel_processor.win32gui.SetForegroundWindow')
-    @patch('service_excel_processor.time.sleep')
+    @patch('services.excel_processor.win32gui.FindWindow')
+    @patch('services.excel_processor.win32gui.SetForegroundWindow')
+    @patch('services.excel_processor.time.sleep')
     def test_bring_excel_to_front_retry(self, mock_sleep, mock_set_foreground, mock_find_window):
         """bring_excel_to_front関数の再試行ケースのテスト"""
         # 最初は失敗、2回目に成功するケース
@@ -114,8 +114,8 @@ class TestExcelProcessor:
         mock_set_foreground.assert_called_once_with(12345)
         mock_sleep.assert_called_once_with(0.1)
 
-    @patch('service_excel_processor.win32gui.FindWindow')
-    @patch('service_excel_processor.time.sleep')
+    @patch('services.excel_processor.win32gui.FindWindow')
+    @patch('services.excel_processor.time.sleep')
     def test_bring_excel_to_front_failure(self, mock_sleep, mock_find_window):
         """bring_excel_to_front関数の失敗ケースのテスト"""
         # ウィンドウが見つからない場合
@@ -129,10 +129,10 @@ class TestExcelProcessor:
         assert mock_find_window.call_count == 2  # 2回試行
         assert mock_sleep.call_count == 2  # 2回sleep（各試行の間に1回ずつ）
 
-    @patch('service_excel_processor.os.path.exists')
-    @patch('service_excel_processor.load_workbook')
-    @patch('service_excel_processor.get_last_row')
-    @patch('service_excel_processor.apply_cell_formats')
+    @patch('services.excel_processor.os.path.exists')
+    @patch('services.excel_processor.load_workbook')
+    @patch('services.excel_processor.get_last_row')
+    @patch('services.excel_processor.apply_cell_formats')
     def test_write_data_to_excel_success(self, mock_apply_formats, mock_get_last_row,
                                          mock_load_workbook, mock_exists, app):
         """write_data_to_excel関数の成功ケースのテスト"""
@@ -189,8 +189,8 @@ class TestExcelProcessor:
         mock_workbook.save.assert_called_once_with("test.xlsm")
         mock_workbook.close.assert_called_once()
 
-    @patch('service_excel_processor.os.path.exists')
-    @patch('service_excel_processor.QMessageBox.critical')
+    @patch('services.excel_processor.os.path.exists')
+    @patch('services.excel_processor.QMessageBox.critical')
     def test_write_data_to_excel_file_not_found(self, mock_critical, mock_exists, app):
         """write_data_to_excel関数のファイル未発見ケースのテスト"""
         # モックの設定
@@ -206,9 +206,9 @@ class TestExcelProcessor:
         mock_exists.assert_called_once_with("nonexistent.xlsm")
         assert not mock_critical.called  # エラーメッセージは表示されない（ログだけ）
 
-    @patch('service_excel_processor.os.path.exists')
-    @patch('service_excel_processor.load_workbook')
-    @patch('service_excel_processor.QMessageBox.critical')
+    @patch('services.excel_processor.os.path.exists')
+    @patch('services.excel_processor.load_workbook')
+    @patch('services.excel_processor.QMessageBox.critical')
     def test_write_data_to_excel_permission_error(self, mock_critical, mock_load_workbook, mock_exists, app):
         """write_data_to_excel関数のファイルオープンエラーケースのテスト"""
         # モックの設定
@@ -229,14 +229,14 @@ class TestExcelProcessor:
         assert "エラー" in args[1]
         assert "別のプロセスで開かれています" in args[2]
 
-    @patch('service_excel_processor.win32com.client.Dispatch')
-    @patch('service_excel_processor.bring_excel_to_front')
-    @patch('service_excel_processor.Path')
-    @patch('service_excel_processor.sort_excel_data')
-    @patch('service_excel_processor.ConfigManager')
-    @patch('service_excel_processor.time.sleep')
-    @patch('service_excel_processor.pyautogui.click')
-    @patch('service_excel_processor.pyautogui.hotkey')
+    @patch('services.excel_processor.win32com.client.Dispatch')
+    @patch('services.excel_processor.bring_excel_to_front')
+    @patch('services.excel_processor.Path')
+    @patch('services.excel_processor.sort_excel_data')
+    @patch('services.excel_processor.ConfigManager')
+    @patch('services.excel_processor.time.sleep')
+    @patch('services.excel_processor.pyautogui.click')
+    @patch('services.excel_processor.pyautogui.hotkey')
     def test_open_and_sort_excel(self, mock_hotkey, mock_click, mock_sleep, mock_config_manager,
                                  mock_sort, mock_path, mock_bring_front, mock_dispatch):
         """open_and_sort_excel関数のテスト"""

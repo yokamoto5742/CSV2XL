@@ -4,13 +4,13 @@ import datetime
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from service_file_manager import backup_excel_file, cleanup_old_csv_files, ensure_directories_exist
+from services.file_manager import backup_excel_file, cleanup_old_csv_files, ensure_directories_exist
 
 
 class TestFileManager:
-    @patch('service_file_manager.shutil.copy2')
-    @patch('service_file_manager.Path')
-    @patch('service_file_manager.ConfigManager')
+    @patch('services.file_manager.shutil.copy2')
+    @patch('services.file_manager.Path')
+    @patch('services.file_manager.ConfigManager')
     def test_backup_excel_file(self, mock_config_manager, mock_path, mock_copy2):
         """バックアップファイル作成機能のテスト"""
         # ConfigManagerのモック設定
@@ -48,9 +48,9 @@ class TestFileManager:
         assert args[0] == 'C:/Excel/test.xlsm'  # コピー元
         assert args[1] == backup_path  # コピー先
 
-    @patch('service_file_manager.shutil.copy2')
-    @patch('service_file_manager.Path')
-    @patch('service_file_manager.ConfigManager')
+    @patch('services.file_manager.shutil.copy2')
+    @patch('services.file_manager.Path')
+    @patch('services.file_manager.ConfigManager')
     def test_backup_excel_file_create_dir(self, mock_config_manager, mock_path, mock_copy2):
         """バックアップディレクトリが存在しない場合のテスト"""
         # ConfigManagerのモック設定
@@ -77,7 +77,7 @@ class TestFileManager:
         # バックアップ処理が実行されたことを確認
         mock_copy2.assert_called_once()
 
-    @patch('service_file_manager.datetime.datetime')
+    @patch('services.file_manager.datetime.datetime')
     def test_cleanup_old_csv_files(self, mock_dt):
         """古いCSVファイルの削除テスト"""
         # 現在時刻を固定
@@ -131,7 +131,7 @@ class TestFileManager:
         file2.unlink.assert_called_once()  # 古いファイルは削除される
         file3.unlink.assert_not_called()  # 非CSVファイルは削除されない
 
-    @patch('service_file_manager.ConfigManager')
+    @patch('services.file_manager.ConfigManager')
     def test_ensure_directories_exist(self, mock_config_manager):
         """必要なディレクトリの存在確認と作成テスト"""
         # ConfigManagerのモック設定
@@ -142,7 +142,7 @@ class TestFileManager:
         mock_config_manager.return_value = mock_config
 
         # Pathのモック設定
-        with patch('service_file_manager.Path') as mock_path:
+        with patch('services.file_manager.Path') as mock_path:
             # 各ディレクトリの存在状態をモック
             mock_downloads = MagicMock()
             mock_downloads.exists.return_value = True  # 既に存在する
@@ -172,7 +172,7 @@ class TestFileManager:
             mock_backup.mkdir.assert_called_once_with(parents=True, exist_ok=True)
             mock_processed.mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
-    @patch('service_file_manager.ConfigManager')
+    @patch('services.file_manager.ConfigManager')
     def test_ensure_directories_exist_exception(self, mock_config_manager):
         """ディレクトリ作成時の例外処理テスト"""
         # ConfigManagerのモック設定
@@ -183,7 +183,7 @@ class TestFileManager:
         mock_config_manager.return_value = mock_config
 
         # Pathのモック設定
-        with patch('service_file_manager.Path') as mock_path:
+        with patch('services.file_manager.Path') as mock_path:
             # ディレクトリ作成で例外を発生させる
             mock_dir = MagicMock()
             mock_dir.exists.return_value = False
