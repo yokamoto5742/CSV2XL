@@ -13,7 +13,7 @@ from ui.dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, AppearanceDialog
 from utils.config_manager import ConfigManager
 from services.coordinate_tracker import CoordinateTracker
 from services.csv_excel_transfer import transfer_csv_to_excel
-from utils.version import VERSION
+from version import VERSION
 
 
 class MainWindow(QMainWindow):
