@@ -7,7 +7,10 @@ from utils.config_manager import ConfigManager
 
 
 def read_csv_with_encoding(file_path):
-    encodings = ['shift-jis', 'utf-8']
+    encodings = [
+        'shift-jis', 'utf-8', 'cp932', 'euc-jp', 'iso-2022-jp',
+        'utf-8-sig', 'latin1', 'shift_jis_2004', 'shift_jisx0213'
+    ]
 
     for encoding in encodings:
         try:
@@ -34,6 +37,30 @@ def read_csv_with_encoding(file_path):
             print(f"{encoding}での読み込み試行中にエラー: {str(e)}")
             continue
 
+    # 最後の手段：エラー処理を含む読み込み
+    for encoding in ['cp932', 'shift-jis', 'utf-8']:
+        try:
+            schema = {
+                "患者ID": pl.Int64,
+            }
+            df = pl.read_csv(
+                file_path,
+                encoding=encoding,
+                separator=',',
+                skip_rows=3,
+                has_header=True,
+                infer_schema_length=0,
+                schema_overrides=schema,
+                ignore_errors=True  # エラーを無視して読み込み
+            )
+            
+            if len(df.columns) > 1:
+                print(f"エンコーディング {encoding} (エラー無視) で読み込みました")
+                return df
+        except Exception as e:
+            print(f"{encoding} (エラー無視) での読み込み試行中にエラー: {str(e)}")
+            continue
+
     raise Exception("CSVファイルの読み込みに失敗しました")
 
 
@@ -56,25 +83,25 @@ def process_csv_data(df):
         # A列からC列を削除
         df = df.select(df.columns[3:])
 
+        # 文書名（D列→削除後は1列目）と医師名（F列→削除後は3列目）のスペースと*を常に除去
+        df = df.with_columns([
+            pl.col(df.columns[0]).str.replace_all(r'[\s*]', ''),  # 文書名
+            pl.col(df.columns[2]).str.replace_all(r'[\s*]', '')  # 医師名
+        ])
+
         config = ConfigManager()
         exclude_docs = config.get_exclude_docs()
         exclude_doctors = config.get_exclude_doctors()
 
-        # 文書名（D列）と医師名（F列）のスペースと*を常に除去
-        df = df.with_columns([
-            pl.col(df.columns[3]).str.replace_all(r'[\s*]', ''),  # D列（文書名）
-            pl.col(df.columns[5]).str.replace_all(r'[\s*]', '')  # F列（医師名）
-        ])
-
         if exclude_docs:
-            filter_conditions = [~pl.col(df.columns[3]).str.contains(doc) for doc in exclude_docs]
+            filter_conditions = [~pl.col(df.columns[0]).str.contains(doc) for doc in exclude_docs]
             combined_filter = filter_conditions[0]
             for condition in filter_conditions[1:]:
                 combined_filter = combined_filter & condition
             df = df.filter(combined_filter)
 
         if exclude_doctors:
-            doctor_filter_conditions = [~pl.col(df.columns[5]).str.contains(doc) for doc in exclude_doctors]
+            doctor_filter_conditions = [~pl.col(df.columns[2]).str.contains(doc) for doc in exclude_doctors]
             doctor_combined_filter = doctor_filter_conditions[0]
             for condition in doctor_filter_conditions[1:]:
                 doctor_combined_filter = doctor_combined_filter & condition
@@ -89,7 +116,7 @@ def process_csv_data(df):
 
 def convert_date_format(df):
     try:
-        date_col = df.columns[3]
+        date_col = df.columns[0]
         df = df.with_columns([
             pl.col(date_col).str.strptime(pl.Date, format="%Y%m%d")
             .alias(date_col)

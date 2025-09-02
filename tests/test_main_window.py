@@ -11,7 +11,7 @@ from PyQt6.QtCore import Qt
 
 from app.main_window import MainWindow
 from utils.config_manager import ConfigManager, CONFIG_PATH
-from utils.version import VERSION
+from app import __version__
 
 
 def restore_config(config, original_config):
@@ -62,7 +62,7 @@ class TestMainWindow:
         window = MainWindow()
 
         # ウィンドウタイトルを確認
-        assert window.windowTitle() == f"CSV取込アプリ v{VERSION}"
+        assert window.windowTitle() == f"CSV取込アプリ v{__version__}"
 
         # 設定に基づくフォントサイズとウィンドウサイズの確認
         config = ConfigManager()

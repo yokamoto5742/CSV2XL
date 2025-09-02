@@ -33,8 +33,8 @@ def transfer_csv_to_excel():
             return
 
         df = read_csv_with_encoding(latest_csv)
-        df = convert_date_format(df)
         df = process_csv_data(df)
+        df = convert_date_format(df)
 
         if write_data_to_excel(excel_path, df):
             # バックアップファイルの作成
