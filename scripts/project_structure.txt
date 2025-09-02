@@ -1,49 +1,35 @@
 ============================================================
-プロジェクト構造: CodeDiary
-パス: C:\Users\yokam\PycharmProjects\CodeDiary
-生成日時: 2025-08-10 15:15:03
+プロジェクト構造: CSV2XL
+パス: C:\Users\yokam\PycharmProjects\CSV2XL
+生成日時: 2025-09-02 15:23:24
 ============================================================
 
-└── CodeDiary
+└── CSV2XL
     ├── app
     │   ├── __init__.py
+    │   ├── dialogs.py
     │   └── main_window.py
     ├── assets
-    │   └── CodeDiary.ico
+    │   ├── CSV2XL.ico
+    │   └── CSV2XL.png
     ├── docs
     │   ├── LICENSE
     │   └── README.md
-    ├── external_service
-    │   ├── __init__.py
-    │   ├── api_factory.py
-    │   ├── base_api.py
-    │   ├── claude_api.py
-    │   ├── gemini_api.py
-    │   └── openai_api.py
     ├── scripts
     │   ├── __init__.py
     │   ├── project_structure.py
     │   └── version_manager.py
-    ├── service
+    ├── services
     │   ├── __init__.py
-    │   ├── git_commit_history.py
-    │   ├── google_form_automation.py
-    │   └── programming_diary_generator.py
+    │   ├── coordinate_tracker.py
+    │   ├── csv_excel_transfer.py
+    │   ├── csv_processor.py
+    │   ├── excel_processor.py
+    │   └── file_manager.py
     ├── utils
     │   ├── config.ini
-    │   ├── config_manager.py
-    │   ├── constants.py
-    │   ├── exceptions.py
-    │   ├── log_rotation.py
-    │   └── repository_name_extractor.py
-    ├── widgets
     │   ├── __init__.py
-    │   ├── control_buttons_widget.py
-    │   ├── date_selection_widget.py
-    │   ├── diary_content_widget.py
-    │   └── progress_widget.py
+    │   └── config_manager.py
     ├── requirements.txt
-    ├── 1.40.0
-    ├── 1.8.2
-    ├── main.py
-    └── prompt_template.md
+    ├── CLAUDE.md
+    └── main.py

@@ -8,13 +8,13 @@ class ProjectStructureGenerator:
     def __init__(self):
         self.ignore_patterns = {
             '__pycache__', '*.pyc', '*.pyo', '*.pyd', '.pytest_cache',
-            '*.egg-info', 'dist', 'build', '.tox', '.coverage', 'htmlcov',
-            '.venv', 'venv', '.env', 'env', 'tests',
+            '*.egg-info', 'dist', 'build', '.tox', '.coverage', 'htmlcov','.claude',
+            '.venv', 'venv', '.env', 'env', 'tests','nul',
             '.vscode', '.idea', '*.swp', '*.swo', '*~',
             '.git', '.gitignore', '.hg', '.svn',
             '.DS_Store', 'Thumbs.db', 'desktop.ini','pytest.ini',
             'node_modules', '.npm',
-            '*.log', '*.tmp', '.cache', 'project_structure.txt'
+            '*.log', '*.tmp', '.cache', 'project_structure.txt', 'CLAUDE.md',
         }
 
         self.important_files = {
