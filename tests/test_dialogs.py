@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QApplication, QDialogButtonBox, QMessageBox, QDialog
 from PyQt6.QtTest import QTest
 from PyQt6.QtCore import Qt
 
-from ui.dialogs import ExcludeItemDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, AppearanceDialog
+from app.dialogs import ExcludeItemDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, AppearanceDialog
 from utils.config_manager import ConfigManager, CONFIG_PATH
 
 
@@ -181,7 +181,7 @@ class TestFolderPathDialog:
         assert dialog.excel_path.text() == 'C:\\Test\\Excel\\test.xlsm'
         assert dialog.backup_path.text() == 'C:\\Test\\Backup'
 
-    @patch('ui.dialogs.QFileDialog.getExistingDirectory')
+    @patch('app.dialogs.QFileDialog.getExistingDirectory')
     def test_browse_folder_downloads(self, mock_get_dir, app, backup_config):
         """ダウンロードフォルダブラウズ機能のテスト"""
         mock_get_dir.return_value = 'C:\\New\\Downloads'
@@ -192,7 +192,7 @@ class TestFolderPathDialog:
         mock_get_dir.assert_called_once()
         assert dialog.downloads_path.text() == 'C:\\New\\Downloads'
 
-    @patch('ui.dialogs.QFileDialog.getExistingDirectory')
+    @patch('app.dialogs.QFileDialog.getExistingDirectory')
     def test_browse_folder_backup(self, mock_get_dir, app, backup_config):
         """バックアップフォルダブラウズ機能のテスト"""
         mock_get_dir.return_value = 'C:\\New\\Backup'
@@ -203,7 +203,7 @@ class TestFolderPathDialog:
         mock_get_dir.assert_called_once()
         assert dialog.backup_path.text() == 'C:\\New\\Backup'
 
-    @patch('ui.dialogs.QFileDialog.getOpenFileName')
+    @patch('app.dialogs.QFileDialog.getOpenFileName')
     def test_browse_folder_excel(self, mock_get_file, app, backup_config):
         """Excelファイルブラウズ機能のテスト"""
         mock_get_file.return_value = ('C:\\New\\Excel\\new.xlsm', 'Excel Files (*.xlsx *.xlsm)')
@@ -214,8 +214,8 @@ class TestFolderPathDialog:
         mock_get_file.assert_called_once()
         assert dialog.excel_path.text() == 'C:\\New\\Excel\\new.xlsm'
 
-    @patch('ui.dialogs.os.path.exists')
-    @patch('ui.dialogs.os.startfile')
+    @patch('app.dialogs.os.path.exists')
+    @patch('app.dialogs.os.startfile')
     def test_open_folder_exists(self, mock_startfile, mock_exists, app, backup_config):
         """フォルダオープン機能のテスト（フォルダが存在する場合）"""
         mock_exists.return_value = True
@@ -226,8 +226,8 @@ class TestFolderPathDialog:
         mock_exists.assert_called_once_with('C:\\Test\\Folder')
         mock_startfile.assert_called_once_with('C:\\Test\\Folder')
 
-    @patch('ui.dialogs.os.path.exists')
-    @patch('ui.dialogs.QMessageBox.warning')
+    @patch('app.dialogs.os.path.exists')
+    @patch('app.dialogs.QMessageBox.warning')
     def test_open_folder_not_exists(self, mock_warning, mock_exists, app, backup_config):
         """フォルダオープン機能のテスト（フォルダが存在しない場合）"""
         mock_exists.return_value = False
@@ -286,7 +286,7 @@ class TestAppearanceDialog:
         assert dialog.window_width_input.text() == '400'
         assert dialog.window_height_input.text() == '300'
 
-    @patch('ui.dialogs.QMessageBox.information')
+    @patch('app.dialogs.QMessageBox.information')
     def test_accept(self, mock_info, app, backup_config):
         """ダイアログ確定時の設定保存テスト"""
         dialog = AppearanceDialog()

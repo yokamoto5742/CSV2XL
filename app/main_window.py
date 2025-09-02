@@ -9,11 +9,11 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QMessageBox
 )
 
-from ui.dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, AppearanceDialog, FolderPathDialog
+from app.dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, AppearanceDialog, FolderPathDialog
 from utils.config_manager import ConfigManager
 from services.coordinate_tracker import CoordinateTracker
 from services.csv_excel_transfer import transfer_csv_to_excel
-from utils.version import VERSION
+from app import __version__
 
 
 class MainWindow(QMainWindow):
@@ -26,7 +26,7 @@ class MainWindow(QMainWindow):
         self.setFont(font)
         window_size = self.config.get_window_size()
         self.setFixedSize(*window_size)
-        self.setWindowTitle(f"CSV取込アプリ v{VERSION}")
+        self.setWindowTitle(f"CSV取込アプリ v{__version__}")
 
         # メインウィジェット
         main_widget = QWidget()

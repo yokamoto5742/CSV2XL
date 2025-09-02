@@ -1,10 +1,10 @@
 import subprocess
-from version_manager import update_version, update_version_py
+
+from scripts.version_manager import update_version
 
 
 def build_executable():
     new_version = update_version()
-    update_version_py(new_version)
 
     subprocess.run([
         "pyinstaller",
