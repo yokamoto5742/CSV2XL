@@ -1,4 +1,3 @@
-import datetime
 import shutil
 from pathlib import Path
 
@@ -61,6 +60,12 @@ def process_csv_data(df):
         exclude_docs = config.get_exclude_docs()
         exclude_doctors = config.get_exclude_doctors()
 
+        # 文書名（D列）と医師名（F列）のスペースと*を常に除去
+        df = df.with_columns([
+            pl.col(df.columns[3]).str.replace_all(r'[\s*]', ''),  # D列（文書名）
+            pl.col(df.columns[5]).str.replace_all(r'[\s*]', '')  # F列（医師名）
+        ])
+
         if exclude_docs:
             filter_conditions = [~pl.col(df.columns[3]).str.contains(doc) for doc in exclude_docs]
             combined_filter = filter_conditions[0]
@@ -74,14 +79,6 @@ def process_csv_data(df):
             for condition in doctor_filter_conditions[1:]:
                 doctor_combined_filter = doctor_combined_filter & condition
             df = df.filter(doctor_combined_filter)
-
-            # D列とF列のスペースと*を除去（4列目と6列目）
-            df = df.with_columns([
-                pl.col(df.columns[3]).str.replace_all(r'[\s*]', ''),  # D列
-                pl.col(df.columns[5]).str.replace_all(r'[\s*]', '')  # F列
-            ])
-
-            return df
 
         return df
 
@@ -124,10 +121,10 @@ def process_completed_csv(csv_path: str):
 def find_latest_csv(downloads_path):
     # ファイル名の形式がYYYYMMDD_HHmmss.csvのファイルを検索
     csv_files = [f for f in Path(downloads_path).glob('*.csv')
-                if len(f.name.split('_')) == 2 and
-                (3 <= len(f.name.split('_')[0]) <= 4) and
-                len(f.name.split('_')[1].split('.')[0]) == 14]
-    
+                 if len(f.name.split('_')) == 2 and
+                 (3 <= len(f.name.split('_')[0]) <= 4) and
+                 len(f.name.split('_')[1].split('.')[0]) == 14]
+
     if not csv_files:
         return None
 
