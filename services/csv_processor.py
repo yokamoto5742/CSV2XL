@@ -96,12 +96,12 @@ def process_csv_data(df):
         # 除外する文書名のフィルタリング
         if exclude_docs:
             for doc in exclude_docs:
-                df = df.filter(~pl.col(df.columns[1]).str.contains(doc))
+                df = df.filter(~pl.col(df.columns[1]).cast(pl.String).str.contains(doc, literal=True))
 
         # 除外する医師名のフィルタリング
         if exclude_doctors:
             for doctor in exclude_doctors:
-                df = df.filter(~pl.col(df.columns[3]).str.contains(doctor))
+                df = df.filter(~pl.col(df.columns[3]).cast(pl.String).str.contains(doctor, literal=True))
 
         return df
 

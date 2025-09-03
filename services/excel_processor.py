@@ -107,12 +107,16 @@ def write_data_to_excel(excel_path, df):
             date_str = str(date_value or '')
 
         # A列からF列までの値を取得（日付は数値形式で保持）
+        # 文書名（C列）と医師名（E列）からスペースを削除
+        doc_name = str(ws.cell(row=row, column=3).value or '').replace(' ', '').replace('　', '')
+        doctor_name = str(ws.cell(row=row, column=5).value or '').replace(' ', '').replace('　', '')
+        
         row_data = (
             date_str,  # 日付を8桁の数値文字列として保持
             str(ws.cell(row=row, column=2).value or ''),
-            str(ws.cell(row=row, column=3).value or ''),
+            doc_name,  # スペース除去済み文書名
             str(ws.cell(row=row, column=4).value or ''),
-            str(ws.cell(row=row, column=5).value or ''),
+            doctor_name,  # スペース除去済み医師名
             str(ws.cell(row=row, column=6).value or '')
         )
         existing_data.add(row_data)
@@ -138,13 +142,16 @@ def write_data_to_excel(excel_path, df):
         else:
             date_str = str(csv_date)
 
-        # 比較用のタプルを作成
+        # 比較用のタプルを作成（文書名と医師名からスペースを削除）
+        csv_doc_name = str(row[2] or '').replace(' ', '').replace('　', '')
+        csv_doctor_name = str(row[4] or '').replace(' ', '').replace('　', '')
+        
         row_data = (
             date_str,
             str(row[1] or ''),
-            str(row[2] or ''),
+            csv_doc_name,  # スペース除去済み文書名
             str(row[3] or ''),
-            str(row[4] or ''),
+            csv_doctor_name,  # スペース除去済み医師名
             str(row[5] or '')
         )
 
@@ -161,7 +168,7 @@ def write_data_to_excel(excel_path, df):
                     date_value = datetime.datetime.strptime(value, '%Y-%m-%d')
                     cell.value = date_value
                     cell.number_format = 'yyyy/mm/dd'
-                except valueError:
+                except ValueError:
                     cell.value = value
             elif j == 1:  # 患者ID列
                 try:
@@ -169,6 +176,12 @@ def write_data_to_excel(excel_path, df):
                     cell.number_format = '0'
                 except ValueError:
                     cell.value = value
+            elif j == 2:  # 文書名列（C列）- スペース除去
+                clean_value = str(value or '').replace(' ', '').replace('　', '')
+                cell.value = clean_value
+            elif j == 4:  # 医師名列（E列）- スペース除去
+                clean_value = str(value or '').replace(' ', '').replace('　', '')
+                cell.value = clean_value
             else:
                 cell.value = value if value is not None else ""
 
