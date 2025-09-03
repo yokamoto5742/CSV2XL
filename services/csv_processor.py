@@ -85,27 +85,23 @@ def process_csv_data(df):
 
         # 文書名（D列→削除後は1列目）と医師名（F列→削除後は3列目）のスペースと*を常に除去
         df = df.with_columns([
-            pl.col(df.columns[0]).str.replace_all(r'[\s*]', ''),  # 文書名
-            pl.col(df.columns[2]).str.replace_all(r'[\s*]', '')  # 医師名
+            pl.col(df.columns[1]).str.replace_all(r'[\s*]', ''),  # 文書名
+            pl.col(df.columns[3]).str.replace_all(r'[\s*]', '')  # 医師名
         ])
 
         config = ConfigManager()
         exclude_docs = config.get_exclude_docs()
         exclude_doctors = config.get_exclude_doctors()
 
+        # 除外する文書名のフィルタリング
         if exclude_docs:
-            filter_conditions = [~pl.col(df.columns[0]).str.contains(doc) for doc in exclude_docs]
-            combined_filter = filter_conditions[0]
-            for condition in filter_conditions[1:]:
-                combined_filter = combined_filter & condition
-            df = df.filter(combined_filter)
+            for doc in exclude_docs:
+                df = df.filter(~pl.col(df.columns[1]).str.contains(doc))
 
+        # 除外する医師名のフィルタリング
         if exclude_doctors:
-            doctor_filter_conditions = [~pl.col(df.columns[2]).str.contains(doc) for doc in exclude_doctors]
-            doctor_combined_filter = doctor_filter_conditions[0]
-            for condition in doctor_filter_conditions[1:]:
-                doctor_combined_filter = doctor_combined_filter & condition
-            df = df.filter(doctor_combined_filter)
+            for doctor in exclude_doctors:
+                df = df.filter(~pl.col(df.columns[3]).str.contains(doctor))
 
         return df
 
