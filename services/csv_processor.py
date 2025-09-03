@@ -85,8 +85,8 @@ def process_csv_data(df):
 
         # 文書名（D列→削除後は1列目）と医師名（F列→削除後は3列目）のスペースと*を常に除去
         df = df.with_columns([
-            pl.col(df.columns[1]).str.replace_all(r'[\s*]', ''),  # 文書名
-            pl.col(df.columns[3]).str.replace_all(r'[\s*]', '')  # 医師名
+            pl.col(df.columns[1]).cast(pl.String).str.replace_all(r'[\s*]', ''),  # 文書名
+            pl.col(df.columns[3]).cast(pl.String).str.replace_all(r'[\s*]', '')  # 医師名
         ])
 
         config = ConfigManager()
