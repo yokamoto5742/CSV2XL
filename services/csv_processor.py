@@ -34,6 +34,9 @@ def read_csv_with_encoding(file_path):
             print(f"{encoding}での読み込み試行中にエラー: {str(e)}")
             continue
 
+    print("すべてのエンコーディングでの読み込みに失敗しました")
+    return None
+
 
 def process_csv_data(df):
     try:
@@ -66,11 +69,11 @@ def process_csv_data(df):
 
         if exclude_docs:
             for doc in exclude_docs:
-                df = df.filter(~pl.col(df.columns[1]).cast(pl.String).str.contains(doc, literal=True))
+                df = df.filter(~pl.col(df.columns[3]).cast(pl.String).str.contains(doc, literal=True))
 
         if exclude_doctors:
             for doctor in exclude_doctors:
-                df = df.filter(~pl.col(df.columns[3]).cast(pl.String).str.contains(doctor, literal=True))
+                df = df.filter(~pl.col(df.columns[5]).cast(pl.String).str.contains(doctor, literal=True))
 
         return df
 
