@@ -86,11 +86,11 @@ def write_data_to_excel(excel_path, df):
         wb = load_workbook(filename=excel_path, keep_vba=True)
     except PermissionError:
         QMessageBox.critical(None,
-                            "エラー",
-                            "Excelファイルが別のプロセスで開かれています。\nファイルを閉じてから再度実行してください。"
-                            )
+                             "エラー",
+                             "Excelファイルが別のプロセスで開かれています。\nファイルを閉じてから再度実行してください。"
+                             )
         return False
-    
+
     ws = wb.active
 
     # 実際のデータが存在する最終行を取得
@@ -161,7 +161,7 @@ def write_data_to_excel(excel_path, df):
                     date_value = datetime.datetime.strptime(value, '%Y-%m-%d')
                     cell.value = date_value
                     cell.number_format = 'yyyy/mm/dd'
-                except valueError:
+                except ValueError:
                     cell.value = value
             elif j == 1:  # 患者ID列
                 try:
@@ -180,28 +180,47 @@ def write_data_to_excel(excel_path, df):
         return True
     except PermissionError:
         QMessageBox.critical(None,
-                            "エラー",
-                            "Excelファイルが別のプロセスで開かれているため、保存できません。\nファイルを閉じてから再度実行してください。"
-                            )
+                             "エラー",
+                             "Excelファイルが別のプロセスで開かれているため、保存できません。\nファイルを閉じてから再度実行してください。"
+                             )
         if 'wb' in locals():
             wb.close()
         return False
 
 
 def open_and_sort_excel(excel_path):
-    excel_path_str = str(Path(excel_path).resolve())
-    excel = win32com.client.Dispatch("Excel.Application")
-    excel.Visible = True
-    bring_excel_to_front()  # 最前面に表示
-    workbook = excel.Workbooks.Open(excel_path_str)
-    excel.WindowState = -4137  # xlMaximized
-    workbook.Windows(1).Activate()
+    excel_path_obj = Path(excel_path)
+
+    # ファイルの存在確認
+    if not excel_path_obj.exists():
+        QMessageBox.critical(None, "エラー", f"Excelファイルが見つかりません: {excel_path}")
+        return
+
+    excel_path_str = str(excel_path_obj.resolve())
+    excel = None
+    workbook = None
 
     try:
+        # Excel アプリケーションを起動
+        excel = win32com.client.Dispatch("Excel.Application")
+        excel.Visible = True
+        bring_excel_to_front()
+
+        # ファイルを開く
+        workbook = excel.Workbooks.Open(excel_path_str)
+
+        # workbook が正常に開かれたか確認
+        if workbook is None:
+            QMessageBox.critical(None, "エラー", "Excelファイルを開くことができませんでした。")
+            return
+
+        excel.WindowState = -4137  # xlMaximized
+        workbook.Windows(1).Activate()
+
         worksheet = workbook.ActiveSheet
         sort_excel_data(worksheet)
 
-        last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row  # データが存在する最後の行を特定する
+        last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
         worksheet.Cells(last_row, 1).Select()
 
         config = ConfigManager()
@@ -211,7 +230,9 @@ def open_and_sort_excel(excel_path):
         pyautogui.click(share_x, share_y)
 
     except Exception as e:
-        print(f"共有ボタンのクリックに失敗しました: {str(e)}")
+        error_msg = f"Excelファイルの処理中にエラーが発生しました: {str(e)}"
+        print(error_msg)
+        QMessageBox.critical(None, "エラー", error_msg)
     finally:
-        # 操作が終わったらExcelは開いたままにする
+        # Excelは開いたままにするが、エラー処理は行う
         pyautogui.hotkey('win', 'down')  # ウィンドウを最小化

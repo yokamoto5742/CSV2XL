@@ -47,18 +47,18 @@ def process_csv_data(df):
             for old_name, new_name in zip(original_columns, unique_columns)
         ])
 
+        # 文書名(G列)と医師名（J列）のスペースと*を常に除去
+        df = df.with_columns([
+            pl.col(df.columns[6]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
+            pl.col(df.columns[9]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
+        ])
+
         # K列とI列を削除
         columns_to_keep = [i for i in range(len(df.columns)) if i not in [8, 10]]
         df = df.select([df.columns[i] for i in columns_to_keep])
 
         # A列からC列を削除
         df = df.select(df.columns[3:])
-
-        # 文書名（D列→削除後は1列目）と医師名（F列→削除後は3列目）のスペースと*を常に除去
-        df = df.with_columns([
-            pl.col(df.columns[1]).cast(pl.String).str.replace_all(r'[\s*]', ''),  # 文書名
-            pl.col(df.columns[3]).cast(pl.String).str.replace_all(r'[\s*]', '')  # 医師名
-        ])
 
         config = ConfigManager()
         exclude_docs = config.get_exclude_docs()
