@@ -178,7 +178,7 @@ class TestExcelProcessor:
         # 結果を確認
         assert result is True
         mock_exists.assert_called_once_with("test.xlsm")
-        mock_load_workbook.assert_called_once_with(filename="test.xlsm", read_only=False, keep_vba=True)
+        mock_load_workbook.assert_called_once_with(filename="test.xlsm", keep_vba=True)
         mock_get_last_row.assert_called_once_with(mock_worksheet)
 
         # 新規データのみが書き込まれることを確認（2行目のみ）
@@ -223,7 +223,7 @@ class TestExcelProcessor:
         # 結果を確認
         assert result is False
         mock_exists.assert_called_once_with("locked.xlsm")
-        mock_load_workbook.assert_called_once_with(filename="locked.xlsm", read_only=False, keep_vba=True)
+        mock_load_workbook.assert_called_once_with(filename="locked.xlsm", keep_vba=True)
         mock_critical.assert_called_once()
         args = mock_critical.call_args[0]
         assert "エラー" in args[1]

@@ -164,13 +164,13 @@ class TestCsvProcessor:
             "col1": ["A", "B", "C", "D"],
             "col2": ["E", "F", "G", "H"],
             "col3": ["I", "J", "K", "L"],
-            "文書名": ["検査結果 A *", "診断書 B", "処方箋 C", "除外文書*"],  # スペースとアスタリスクを含むデータ
+            "col4": ["M", "N", "O", "P"],
+            "col5": ["Q", "R", "S", "T"],
+            "文書名": ["検査結果 A *", "診断書 B", "処方箋 C", "除外文書*"],  # G列：スペースとアスタリスクを含むデータ
             "日付": ["20240101", "20240102", "20240103", "20240104"],
-            "医師名": ["田中 医師 *", "除外 医師", "佐藤医師", "鈴木 医師"],  # スペースとアスタリスクを含むデータ
-            "col7": ["内容1", "内容2", "内容3", "内容4"],
-            "col8": ["削除予定", "削除予定", "削除予定", "削除予定"],  # K列（インデックス8）
-            "col9": ["データ", "データ", "データ", "データ"],
-            "col10": ["削除予定", "削除予定", "削除予定", "削除予定"]  # I列（インデックス10）
+            "col8": ["削除予定", "削除予定", "削除予定", "削除予定"],  # I列（インデックス8）削除される
+            "医師名": ["田中 医師 *", "除外 医師", "佐藤医師", "鈴木 医師"],  # J列：スペースとアスタリスクを含むデータ
+            "col10": ["削除予定", "削除予定", "削除予定", "削除予定"]  # K列（インデックス10）削除される
         })
     
     @patch('services.csv_processor.ConfigManager')
@@ -190,9 +190,9 @@ class TestCsvProcessor:
         
         # 結果確認（除外されていないこと）
         assert len(result_df) == 4  # 全ての行が残る
-        # 処理後は文書名がcol_4_文書名（インデックス1）、医師名がcol_6_医師名（インデックス3）
-        doc_col_idx = 1  # col_4_文書名
-        doctor_col_idx = 3  # col_6_医師名
+        # 処理後は文書名がcol_6_文書名（インデックス3）、医師名がcol_9_医師名（インデックス5）
+        doc_col_idx = 3  # col_6_文書名（元G列）
+        doctor_col_idx = 5  # col_9_医師名（元J列）
         # スペースとアスタリスクが除去されることを確認
         doc_values = result_df[result_df.columns[doc_col_idx]].to_list()
         doctor_values = result_df[result_df.columns[doctor_col_idx]].to_list()
@@ -219,8 +219,8 @@ class TestCsvProcessor:
         
         # 結果確認（除外文書の行が削除されていること）
         assert len(result_df) == 3
-        doc_col_idx = 1  # col_4_文書名
-        doctor_col_idx = 3  # col_6_医師名
+        doc_col_idx = 3  # col_6_文書名（元G列）
+        doctor_col_idx = 5  # col_9_医師名（元J列）
         assert "除外文書" not in result_df[result_df.columns[doc_col_idx]].to_list()
         assert "除外医師" in result_df[result_df.columns[doctor_col_idx]].to_list()  # 医師は残る
     
@@ -241,8 +241,8 @@ class TestCsvProcessor:
         
         # 結果確認（除外医師の行が削除されていること）
         assert len(result_df) == 3
-        doc_col_idx = 1  # col_4_文書名
-        doctor_col_idx = 3  # col_6_医師名
+        doc_col_idx = 3  # col_6_文書名（元G列）
+        doctor_col_idx = 5  # col_9_医師名（元J列）
         assert "除外文書" in result_df[result_df.columns[doc_col_idx]].to_list()  # 文書は残る
         assert "除外医師" not in result_df[result_df.columns[doctor_col_idx]].to_list()
     
@@ -263,8 +263,8 @@ class TestCsvProcessor:
         
         # 結果確認（両方の除外条件に該当する行が削除されていること）
         assert len(result_df) == 2
-        doc_col_idx = 1  # col_4_文書名
-        doctor_col_idx = 3  # col_6_医師名
+        doc_col_idx = 3  # col_6_文書名（元G列）
+        doctor_col_idx = 5  # col_9_医師名（元J列）
         assert "除外文書" not in result_df[result_df.columns[doc_col_idx]].to_list()
         assert "除外医師" not in result_df[result_df.columns[doctor_col_idx]].to_list()
     
@@ -284,9 +284,9 @@ class TestCsvProcessor:
         result_df = process_csv_data(df)
         
         # 結果確認（部分一致で除外されていること）
-        assert len(result_df) == 3  # "検査結果 A"と"田中医師"の行が除外される
-        doc_col_idx = 1  # col_4_文書名
-        doctor_col_idx = 3  # col_6_医師名
+        assert len(result_df) == 3  # "検査結果A"（スペース・*除去後）と"田中医師"の行が除外される
+        doc_col_idx = 3  # col_6_文書名（元G列）
+        doctor_col_idx = 5  # col_9_医師名（元J列）
         doc_list = result_df[result_df.columns[doc_col_idx]].to_list()
         doctor_list = result_df[result_df.columns[doctor_col_idx]].to_list()
         
@@ -311,9 +311,9 @@ class TestCsvProcessor:
         result_df = process_csv_data(df)
         
         # 結果確認（複数の除外条件に該当する行が全て削除されていること）
-        assert len(result_df) == 1  # 「処方箋 C」と「佐藤医師」の組み合わせも除外される
-        doc_col_idx = 1  # col_4_文書名
-        doctor_col_idx = 3  # col_6_医師名
+        assert len(result_df) == 1  # 「処方箋C」と「佐藤医師」の組み合わせも除外される
+        doc_col_idx = 3  # col_6_文書名（元G列）
+        doctor_col_idx = 5  # col_9_医師名（元J列）
         doc_list = result_df[result_df.columns[doc_col_idx]].to_list()
         doctor_list = result_df[result_df.columns[doctor_col_idx]].to_list()
         
