@@ -7,10 +7,7 @@ from utils.config_manager import ConfigManager
 
 
 def read_csv_with_encoding(file_path):
-    encodings = [
-        'shift-jis', 'utf-8', 'cp932', 'euc-jp', 'iso-2022-jp',
-        'utf-8-sig', 'latin1', 'shift_jis_2004', 'shift_jisx0213'
-    ]
+    encodings = ['shift-jis', 'utf-8', 'cp932']
 
     for encoding in encodings:
         try:
@@ -37,32 +34,6 @@ def read_csv_with_encoding(file_path):
             print(f"{encoding}での読み込み試行中にエラー: {str(e)}")
             continue
 
-    # 最後の手段：エラー処理を含む読み込み
-    for encoding in ['cp932', 'shift-jis', 'utf-8']:
-        try:
-            schema = {
-                "患者ID": pl.Int64,
-            }
-            df = pl.read_csv(
-                file_path,
-                encoding=encoding,
-                separator=',',
-                skip_rows=3,
-                has_header=True,
-                infer_schema_length=0,
-                schema_overrides=schema,
-                ignore_errors=True  # エラーを無視して読み込み
-            )
-            
-            if len(df.columns) > 1:
-                print(f"エンコーディング {encoding} (エラー無視) で読み込みました")
-                return df
-        except Exception as e:
-            print(f"{encoding} (エラー無視) での読み込み試行中にエラー: {str(e)}")
-            continue
-
-    raise Exception("CSVファイルの読み込みに失敗しました")
-
 
 def process_csv_data(df):
     try:
@@ -76,7 +47,7 @@ def process_csv_data(df):
             for old_name, new_name in zip(original_columns, unique_columns)
         ])
 
-        # K列とI列を削除 (インデックスベースで削除)
+        # K列とI列を削除
         columns_to_keep = [i for i in range(len(df.columns)) if i not in [8, 10]]
         df = df.select([df.columns[i] for i in columns_to_keep])
 
@@ -93,12 +64,10 @@ def process_csv_data(df):
         exclude_docs = config.get_exclude_docs()
         exclude_doctors = config.get_exclude_doctors()
 
-        # 除外する文書名のフィルタリング
         if exclude_docs:
             for doc in exclude_docs:
                 df = df.filter(~pl.col(df.columns[1]).cast(pl.String).str.contains(doc, literal=True))
 
-        # 除外する医師名のフィルタリング
         if exclude_doctors:
             for doctor in exclude_doctors:
                 df = df.filter(~pl.col(df.columns[3]).cast(pl.String).str.contains(doctor, literal=True))
@@ -142,10 +111,10 @@ def process_completed_csv(csv_path: str):
 
 
 def find_latest_csv(downloads_path):
-    # ファイル名の形式がYYYYMMDD_HHmmss.csvのファイルを検索
+    # ファイル名の形式が職員ID(3桁か4桁)_YYYYMMDDHHmmss.csvのファイルを検索
     csv_files = [f for f in Path(downloads_path).glob('*.csv')
                  if len(f.name.split('_')) == 2 and
-                 (3 <= len(f.name.split('_')[0]) <= 4) and
+                 (0 <= len(f.name.split('_')[0]) <= 5) and
                  len(f.name.split('_')[1].split('.')[0]) == 14]
 
     if not csv_files:
