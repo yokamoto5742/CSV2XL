@@ -1,9 +1,7 @@
-import traceback
 from pathlib import Path
 
 from PyQt6.QtWidgets import QMessageBox
 
-from utils.config_manager import ConfigManager
 from services.csv_processor import (
     find_latest_csv,
     read_csv_with_encoding,
@@ -13,7 +11,7 @@ from services.csv_processor import (
 )
 from services.excel_processor import write_data_to_excel, open_and_sort_excel
 from services.file_manager import backup_excel_file, cleanup_old_csv_files, ensure_directories_exist
-
+from utils.config_manager import ConfigManager
 
 
 def transfer_csv_to_excel():
@@ -37,13 +35,10 @@ def transfer_csv_to_excel():
         df = convert_date_format(df)
 
         if write_data_to_excel(excel_path, df):
-            # バックアップファイルの作成
             backup_excel_file(excel_path)
 
-            # 処理済みファイルを移動
             process_completed_csv(latest_csv)
-            
-            # Excelファイルを開いてソートし共有ボタンをクリック
+
             open_and_sort_excel(excel_path)
         
     except Exception as e:
