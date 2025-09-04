@@ -83,7 +83,7 @@ def write_data_to_excel(excel_path, df):
         return False
 
     try:
-        wb = load_workbook(filename=excel_path, read_only=False, keep_vba=True)
+        wb = load_workbook(filename=excel_path, keep_vba=True)
     except PermissionError:
         QMessageBox.critical(None,
                             "エラー",
