@@ -218,6 +218,12 @@ def open_and_sort_excel(excel_path):
         workbook.Windows(1).Activate()
 
         worksheet = workbook.ActiveSheet
+
+        # フィルタがかかっていれば解除
+        if worksheet.AutoFilterMode:
+            if worksheet.FilterMode:
+                worksheet.ShowAllData()
+
         sort_excel_data(worksheet)
 
         last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
@@ -235,4 +241,4 @@ def open_and_sort_excel(excel_path):
         QMessageBox.critical(None, "エラー", error_msg)
     finally:
         # Excelは開いたままにするが、エラー処理は行う
-        pyautogui.hotkey('win', 'down')  # ウィンドウを最小化
+        pyautogui.hotkey('win', 'down')  # ウィンドウを最小化  # ウィンドウを最小化
