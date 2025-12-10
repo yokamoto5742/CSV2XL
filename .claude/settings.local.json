@@ -37,11 +37,11 @@
       "Read(.env.*)",
       "Read(id_rsa)",
       "Read(id_ed25519)",
-      "Read(LICENSE*)",
+      "Read(docs/LICENSE*)",
       "Read(**/*token*)",
       "Read(**/*key*)",
       "Write(.env*)",
-      "Write(LICENSE*)",
+      "Write(docs/LICENSE*)",
       "Write(**/secrets/**)",
       "Bash(curl:*)",
       "Bash(wget:*)",
@@ -62,18 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('作業が完了しました', 'Claude Code', 'OK', 'Information')\""
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('作業が完了しました', 'Claude Code', 'OK', 'Information')\""
+            "command": "powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('タスクが完了しました', 'Claude Code', 'OK', 'Information')\""
           }
         ]
       }
@@ -84,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Claude Code セッションが終了しました', 'Claude Code', 'OK', 'Information')\""
+            "command": "powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('セッションが終了しました', 'Claude Code', 'OK', 'Information')\""
           }
         ]
       }
