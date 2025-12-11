@@ -1,4 +1,3 @@
-import os
 import datetime
 import time
 from pathlib import Path
@@ -78,7 +77,7 @@ def bring_excel_to_front():
 
 
 def write_data_to_excel(excel_path, df):
-    if not os.path.exists(excel_path) or not excel_path.endswith('.xlsm'):
+    if not Path(excel_path).exists() or not excel_path.endswith('.xlsm'):
         print(f"Excelファイルが見つかりません: {excel_path}")
         return False
 
@@ -188,6 +187,23 @@ def write_data_to_excel(excel_path, df):
         return False
 
 
+def clear_all_filters(worksheet):
+    """すべてのフィルタを完全に解除する"""
+    try:
+        if worksheet.AutoFilterMode:
+            # フィルタ条件が適用されていれば、まずすべてのデータを表示
+            try:
+                if worksheet.FilterMode:
+                    worksheet.ShowAllData()
+            except Exception:
+                pass
+            # オートフィルタ自体を解除
+            worksheet.AutoFilterMode = False
+            print("オートフィルタを解除しました")
+    except Exception as e:
+        print(f"フィルタ解除中にエラーが発生しました: {str(e)}")
+
+
 def open_and_sort_excel(excel_path):
     excel_path_obj = Path(excel_path)
 
@@ -219,10 +235,8 @@ def open_and_sort_excel(excel_path):
 
         worksheet = workbook.ActiveSheet
 
-        # フィルタがかかっていれば解除
-        if worksheet.AutoFilterMode:
-            if worksheet.FilterMode:
-                worksheet.ShowAllData()
+        # フィルタがかかっていれば完全に解除
+        clear_all_filters(worksheet)
 
         sort_excel_data(worksheet)
 
@@ -241,4 +255,4 @@ def open_and_sort_excel(excel_path):
         QMessageBox.critical(None, "エラー", error_msg)
     finally:
         # Excelは開いたままにするが、エラー処理は行う
-        pyautogui.hotkey('win', 'down')  # ウィンドウを最小化  # ウィンドウを最小化
+        pyautogui.hotkey('win', 'down')  # ウィンドウを最小化
