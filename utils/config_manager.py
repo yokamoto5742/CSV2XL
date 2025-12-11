@@ -2,12 +2,12 @@ import configparser
 import os
 import sys
 from pathlib import Path
-from typing import Final, List
+from typing import List
 
 def get_config_path() -> Path:
     # 実行ファイルのディレクトリを取得
     if getattr(sys, 'frozen', False):
-        base_path = Path(sys._MEIPASS)
+        base_path = Path(sys._MEIPASS)  # type: ignore[attr-defined]
     else:
         base_path = Path(os.path.dirname(os.path.abspath(__file__)))
     return base_path / 'config.ini'

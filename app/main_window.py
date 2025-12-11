@@ -1,11 +1,5 @@
-import os
-import sys
-from pathlib import Path
-
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout,
+    QMainWindow, QWidget, QVBoxLayout,
     QPushButton, QLabel, QMessageBox
 )
 

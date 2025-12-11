@@ -1,5 +1,4 @@
 import os
-import sys
 from pathlib import Path
 
 from PyQt6.QtGui import QIntValidator
@@ -71,7 +70,9 @@ class ExcludeItemDialog(QDialog):
     def accept(self):
         items = []
         for i in range(self.item_list.count()):
-            items.append(self.item_list.item(i).text())
+            item = self.item_list.item(i)
+            if item is not None:
+                items.append(item.text())
 
         if self.config_section not in self.config.config:
             self.config.config[self.config_section] = {}

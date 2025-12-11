@@ -99,20 +99,26 @@ def write_data_to_excel(excel_path, df):
     existing_data = set()
     for row in range(2, last_row + 1):  # ヘッダー行をスキップ
         # 日付をYYYYMMDD形式の文字列として取得
-        date_value = ws.cell(row=row, column=1).value
+        cell1 = ws.cell(row=row, column=1)  # type: ignore[misc]
+        date_value = cell1.value if cell1 else None
         if isinstance(date_value, datetime.datetime):
             date_str = date_value.strftime('%Y%m%d')
         else:
             date_str = str(date_value or '')
 
         # A列からF列までの値を取得（日付は数値形式で保持）
+        cell2 = ws.cell(row=row, column=2)  # type: ignore[misc]
+        cell3 = ws.cell(row=row, column=3)  # type: ignore[misc]
+        cell4 = ws.cell(row=row, column=4)  # type: ignore[misc]
+        cell5 = ws.cell(row=row, column=5)  # type: ignore[misc]
+        cell6 = ws.cell(row=row, column=6)  # type: ignore[misc]
         row_data = (
             date_str,  # 日付を8桁の数値文字列として保持
-            str(ws.cell(row=row, column=2).value or ''),
-            str(ws.cell(row=row, column=3).value or ''),
-            str(ws.cell(row=row, column=4).value or ''),
-            str(ws.cell(row=row, column=5).value or ''),
-            str(ws.cell(row=row, column=6).value or '')
+            str(cell2.value or '') if cell2 else '',
+            str(cell3.value or '') if cell3 else '',
+            str(cell4.value or '') if cell4 else '',
+            str(cell5.value or '') if cell5 else '',
+            str(cell6.value or '') if cell6 else ''
         )
         existing_data.add(row_data)
 
@@ -153,23 +159,23 @@ def write_data_to_excel(excel_path, df):
     # 重複しないデータのみを書き込む
     for i, row in enumerate(unique_data):
         for j, value in enumerate(row):
-            cell = ws.cell(row=last_row + 1 + i, column=j + 1)
+            cell = ws.cell(row=last_row + 1 + i, column=j + 1)  # type: ignore[misc]
 
             if j == 0:  # 日付列
                 try:
                     date_value = datetime.datetime.strptime(value, '%Y-%m-%d')
-                    cell.value = date_value
+                    cell.value = date_value  # type: ignore[attr-defined]
                     cell.number_format = 'yyyy/mm/dd'
                 except ValueError:
-                    cell.value = value
+                    cell.value = value  # type: ignore[attr-defined]
             elif j == 1:  # 患者ID列
                 try:
-                    cell.value = int(value.replace(',', ''))
+                    cell.value = int(value.replace(',', ''))  # type: ignore[attr-defined]
                     cell.number_format = '0'
                 except ValueError:
-                    cell.value = value
+                    cell.value = value  # type: ignore[attr-defined]
             else:
-                cell.value = value if value is not None else ""
+                cell.value = value if value is not None else ""  # type: ignore[attr-defined]
 
     apply_cell_formats(ws, last_row + 1)
 

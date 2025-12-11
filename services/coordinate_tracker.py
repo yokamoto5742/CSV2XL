@@ -1,4 +1,3 @@
-import sys
 import pyautogui
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QShortcut, QKeySequence
@@ -36,4 +35,6 @@ class CoordinateTracker(QMainWindow):
     @staticmethod
     def copy_coordinates():
         x, y = pyautogui.position()
-        QApplication.clipboard().setText(f"{x}, {y}")
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(f"{x}, {y}")
