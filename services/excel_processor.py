@@ -187,19 +187,59 @@ def write_data_to_excel(excel_path, df):
         return False
 
 
-def clear_all_filters(worksheet):
-    """すべてのフィルタを完全に解除する"""
+def clear_all_filters(worksheet, workbook):
+    """
+    すべてのフィルタを解除する
+    共有ブックの場合はAutoFilterModeの変更ができないため、
+    ShowAllDataのみでフィルタ条件をクリアする
+    """
     try:
-        if worksheet.AutoFilterMode:
-            # フィルタ条件が適用されていれば、まずすべてのデータを表示
+        is_shared = False
+        try:
+            # 共有ブックかどうかを確認
+            is_shared = workbook.MultiUserEditing
+        except Exception:
+            pass
+
+        if not worksheet.AutoFilterMode:
+            print("オートフィルタは設定されていません")
+            return
+
+        # フィルタ条件が適用されていれば、すべてのデータを表示
+        try:
+            if worksheet.FilterMode:
+                worksheet.ShowAllData()
+                print("フィルタ条件をクリアしました")
+        except Exception as e:
+            print(f"ShowAllData実行中にエラー: {str(e)}")
+
+        # 各列のフィルタを個別にクリアする（ShowAllDataが効かない場合の対策）
+        try:
+            if worksheet.AutoFilterMode:
+                auto_filter = worksheet.AutoFilter
+                if auto_filter is not None:
+                    filters = auto_filter.Filters
+                    for i in range(1, filters.Count + 1):
+                        try:
+                            if filters.Item(i).On:
+                                # 各列のフィルタ条件をクリア
+                                auto_filter.Range.AutoFilter(Field=i)
+                        except Exception:
+                            pass
+                    print("個別のフィルタ条件をクリアしました")
+        except Exception as e:
+            print(f"個別フィルタクリア中にエラー: {str(e)}")
+
+        # 共有ブックでない場合のみ、オートフィルタ自体を解除
+        if not is_shared:
             try:
-                if worksheet.FilterMode:
-                    worksheet.ShowAllData()
-            except Exception:
-                pass
-            # オートフィルタ自体を解除
-            worksheet.AutoFilterMode = False
-            print("オートフィルタを解除しました")
+                worksheet.AutoFilterMode = False
+                print("オートフィルタを解除しました")
+            except Exception as e:
+                print(f"AutoFilterMode解除中にエラー（共有ブックの可能性）: {str(e)}")
+        else:
+            print("共有ブックのため、オートフィルタの解除はスキップしました（フィルタ条件はクリア済み）")
+
     except Exception as e:
         print(f"フィルタ解除中にエラーが発生しました: {str(e)}")
 
@@ -235,8 +275,8 @@ def open_and_sort_excel(excel_path):
 
         worksheet = workbook.ActiveSheet
 
-        # フィルタがかかっていれば完全に解除
-        clear_all_filters(worksheet)
+        # フィルタがかかっていれば解除（共有ブック対応）
+        clear_all_filters(worksheet, workbook)
 
         sort_excel_data(worksheet)
 
