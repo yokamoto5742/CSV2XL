@@ -13,6 +13,7 @@ from app.dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, AppearanceDialo
 from utils.config_manager import ConfigManager
 from services.coordinate_tracker import CoordinateTracker
 from services.csv_excel_transfer import transfer_csv_to_excel
+from services.file_manager import cleanup_old_backup_files
 from app import __version__
 
 
@@ -20,6 +21,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = ConfigManager()
+        # アプリ起動時に古いバックアップファイルを削除
+        cleanup_old_backup_files()
         self.tracker = CoordinateTracker()
         font = self.font()
         font.setPointSize(self.config.get_font_size())

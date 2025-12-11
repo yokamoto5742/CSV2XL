@@ -153,6 +153,19 @@ class ConfigManager:
         except (IOError, OSError) as e:
             raise OSError(f"Failed to load config: {e}") from e
 
+    def get_backup_retention_days(self) -> int:
+        """バックアップファイルの保持日数を取得"""
+        if 'Backup' not in self.config:
+            return 7  # デフォルトは7日
+        return self.config.getint('Backup', 'retention_days', fallback=7)
+
+    def set_backup_retention_days(self, days: int) -> None:
+        """バックアップファイルの保持日数を設定"""
+        if 'Backup' not in self.config:
+            self.config['Backup'] = {}
+        self.config['Backup']['retention_days'] = str(days)
+        self.save_config()
+
     def _ensure_section(self, section: str) -> None:
         """設定セクションが存在することを確認し、必要に応じて作成する"""
         if section not in self.config:

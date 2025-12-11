@@ -35,10 +35,10 @@ def transfer_csv_to_excel():
         df = convert_date_format(df)
 
         if write_data_to_excel(excel_path, df):
-            backup_excel_file(excel_path)
-
             process_completed_csv(latest_csv)
 
+            # Excelファイルを開く直前にバックアップを取る
+            backup_excel_file(excel_path)
             open_and_sort_excel(excel_path)
         
     except Exception as e:

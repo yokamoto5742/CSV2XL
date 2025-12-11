@@ -7,16 +7,21 @@ from utils.config_manager import ConfigManager
 
 
 def backup_excel_file(excel_path):
+    """Excelファイルのバックアップを作成（医療文書担当一覧_yyyymmddhhmm.xlsm形式）"""
     config = ConfigManager()
     backup_dir = Path(config.get_backup_path())
 
     if not backup_dir.exists():
         backup_dir.mkdir(parents=True)
 
-    backup_path = backup_dir / f"backup_{Path(excel_path).name}"
+    # 現在の日時を取得してファイル名を生成
+    timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M')
+    backup_filename = f"医療文書担当一覧_{timestamp}.xlsm"
+    backup_path = backup_dir / backup_filename
 
     try:
         shutil.copy2(excel_path, backup_path)
+        print(f"バックアップを作成しました: {backup_path}")
     except Exception as e:
         print(f"バックアップ作成中にエラーが発生しました: {str(e)}")
         raise
@@ -31,6 +36,26 @@ def cleanup_old_csv_files(processed_dir: Path):
                 file.unlink()
             except Exception as e:
                 print(f"ファイル削除中にエラーが発生しました: {file} - {str(e)}")
+
+
+def cleanup_old_backup_files():
+    """Config.iniで指定した日数より前のバックアップファイルを削除"""
+    config = ConfigManager()
+    backup_dir = Path(config.get_backup_path())
+    retention_days = config.get_backup_retention_days()
+
+    if not backup_dir.exists():
+        return
+
+    current_time = datetime.datetime.now()
+    for file in backup_dir.glob("医療文書担当一覧_*.xlsm"):
+        file_time = datetime.datetime.fromtimestamp(file.stat().st_mtime)
+        if (current_time - file_time).days >= retention_days:
+            try:
+                file.unlink()
+                print(f"古いバックアップを削除しました: {file}")
+            except Exception as e:
+                print(f"バックアップ削除中にエラーが発生しました: {file} - {str(e)}")
 
 
 def ensure_directories_exist():
