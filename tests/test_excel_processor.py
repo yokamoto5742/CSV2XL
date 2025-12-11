@@ -129,15 +129,18 @@ class TestExcelProcessor:
         assert mock_find_window.call_count == 2  # 2回試行
         assert mock_sleep.call_count == 2  # 2回sleep（各試行の間に1回ずつ）
 
-    @patch('services.excel_processor.os.path.exists')
+    @patch('services.excel_processor.Path')
     @patch('services.excel_processor.load_workbook')
     @patch('services.excel_processor.get_last_row')
     @patch('services.excel_processor.apply_cell_formats')
     def test_write_data_to_excel_success(self, mock_apply_formats, mock_get_last_row,
-                                         mock_load_workbook, mock_exists, app):
+                                         mock_load_workbook, mock_path, app):
         """write_data_to_excel関数の成功ケースのテスト"""
         # モックの設定
-        mock_exists.return_value = True
+        mock_path_instance = MagicMock()
+        mock_path_instance.exists.return_value = True
+        mock_path.return_value = mock_path_instance
+
         mock_workbook, mock_worksheet = MagicMock(), MagicMock()
         mock_load_workbook.return_value = mock_workbook
         mock_workbook.active = mock_worksheet
@@ -177,7 +180,8 @@ class TestExcelProcessor:
 
         # 結果を確認
         assert result is True
-        mock_exists.assert_called_once_with("test.xlsm")
+        mock_path.assert_called_once_with("test.xlsm")
+        mock_path_instance.exists.assert_called_once()
         mock_load_workbook.assert_called_once_with(filename="test.xlsm", keep_vba=True)
         mock_get_last_row.assert_called_once_with(mock_worksheet)
 
@@ -189,12 +193,14 @@ class TestExcelProcessor:
         mock_workbook.save.assert_called_once_with("test.xlsm")
         mock_workbook.close.assert_called_once()
 
-    @patch('services.excel_processor.os.path.exists')
+    @patch('services.excel_processor.Path')
     @patch('services.excel_processor.QMessageBox.critical')
-    def test_write_data_to_excel_file_not_found(self, mock_critical, mock_exists, app):
+    def test_write_data_to_excel_file_not_found(self, mock_critical, mock_path, app):
         """write_data_to_excel関数のファイル未発見ケースのテスト"""
         # モックの設定
-        mock_exists.return_value = False
+        mock_path_instance = MagicMock()
+        mock_path_instance.exists.return_value = False
+        mock_path.return_value = mock_path_instance
 
         # 関数実行
         import polars as pl
@@ -203,16 +209,20 @@ class TestExcelProcessor:
 
         # 結果を確認
         assert result is False
-        mock_exists.assert_called_once_with("nonexistent.xlsm")
+        mock_path.assert_called_once_with("nonexistent.xlsm")
+        mock_path_instance.exists.assert_called_once()
         assert not mock_critical.called  # エラーメッセージは表示されない（ログだけ）
 
-    @patch('services.excel_processor.os.path.exists')
+    @patch('services.excel_processor.Path')
     @patch('services.excel_processor.load_workbook')
     @patch('services.excel_processor.QMessageBox.critical')
-    def test_write_data_to_excel_permission_error(self, mock_critical, mock_load_workbook, mock_exists, app):
+    def test_write_data_to_excel_permission_error(self, mock_critical, mock_load_workbook, mock_path, app):
         """write_data_to_excel関数のファイルオープンエラーケースのテスト"""
         # モックの設定
-        mock_exists.return_value = True
+        mock_path_instance = MagicMock()
+        mock_path_instance.exists.return_value = True
+        mock_path.return_value = mock_path_instance
+
         mock_load_workbook.side_effect = PermissionError("ファイルが開かれています")
 
         # 関数実行
@@ -222,7 +232,8 @@ class TestExcelProcessor:
 
         # 結果を確認
         assert result is False
-        mock_exists.assert_called_once_with("locked.xlsm")
+        mock_path.assert_called_once_with("locked.xlsm")
+        mock_path_instance.exists.assert_called_once()
         mock_load_workbook.assert_called_once_with(filename="locked.xlsm", keep_vba=True)
         mock_critical.assert_called_once()
         args = mock_critical.call_args[0]
