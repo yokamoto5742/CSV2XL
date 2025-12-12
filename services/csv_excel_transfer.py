@@ -14,7 +14,7 @@ from services.file_manager import backup_excel_file, cleanup_old_csv_files, ensu
 from utils.config_manager import ConfigManager
 
 
-def transfer_csv_to_excel():
+def transfer_csv_to_excel() -> None:
     """ダウンロードフォルダからCSVファイルを読み込みExcelファイルに転記"""
     try:
         config = ConfigManager()
@@ -32,6 +32,9 @@ def transfer_csv_to_excel():
             return
 
         df = read_csv_with_encoding(latest_csv)
+        if df is None:
+            QMessageBox.warning(None, "警告", "CSVファイルの読み込みに失敗しました。")
+            return
         df = process_csv_data(df)
         df = convert_date_format(df)
 
@@ -39,6 +42,6 @@ def transfer_csv_to_excel():
             process_completed_csv(latest_csv)
             backup_excel_file(excel_path)
             open_and_sort_excel(excel_path)
-        
+
     except Exception as e:
         QMessageBox.critical(None, "エラー", f"CSVファイルの取り込み中にエラーが発生しました:\n{str(e)}")

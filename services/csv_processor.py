@@ -1,12 +1,13 @@
 import shutil
 from pathlib import Path
+from typing import Optional
 
 import polars as pl
 
 from utils.config_manager import ConfigManager
 
 
-def read_csv_with_encoding(file_path):
+def read_csv_with_encoding(file_path: str) -> Optional[pl.DataFrame]:
     """複数のエンコーディングを試してCSVファイルを読み込む"""
     encodings = ['shift-jis', 'cp932', 'utf-8']
 
@@ -39,7 +40,7 @@ def read_csv_with_encoding(file_path):
     return None
 
 
-def process_csv_data(df):
+def process_csv_data(df: pl.DataFrame) -> pl.DataFrame:
     """CSVデータをExcel出力用に加工
     列名の一意化、スペースと*の除去、指定列の削除、除外データのフィルタリング"""
     try:
@@ -85,7 +86,7 @@ def process_csv_data(df):
         raise
 
 
-def convert_date_format(df):
+def convert_date_format(df: pl.DataFrame) -> pl.DataFrame:
     """日付列をYYYYMMDD形式からDate型に変換"""
     try:
         date_col = df.columns[0]
@@ -99,7 +100,7 @@ def convert_date_format(df):
         return df
 
 
-def process_completed_csv(csv_path: str):
+def process_completed_csv(csv_path: str) -> None:
     """処理済みCSVファイルを指定ディレクトリに移動"""
     try:
         csv_file = Path(csv_path)
@@ -118,7 +119,7 @@ def process_completed_csv(csv_path: str):
         raise
 
 
-def find_latest_csv(downloads_path):
+def find_latest_csv(downloads_path: str) -> Optional[str]:
     """ダウンロードフォルダから最新のCSVファイルを取得
 
     職員ID_YYYYMMDDHHmmss形式のファイルを検索して最も新しいものを返す

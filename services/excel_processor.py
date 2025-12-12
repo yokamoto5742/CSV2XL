@@ -1,6 +1,7 @@
 import datetime
 import time
 from pathlib import Path
+from typing import Any, cast
 
 import polars as pl
 import pyautogui
@@ -8,12 +9,13 @@ import win32com.client
 import win32gui
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
+from openpyxl.worksheet.worksheet import Worksheet
 from PyQt6.QtWidgets import QMessageBox
 
 from utils.config_manager import ConfigManager
 
 
-def get_last_row(worksheet):
+def get_last_row(worksheet: Worksheet) -> int:
     """ワークシートの最後のデータ行番号を取得
 
     Args:
@@ -30,7 +32,7 @@ def get_last_row(worksheet):
     return last_row
 
 
-def apply_cell_formats(worksheet, start_row):
+def apply_cell_formats(worksheet: Worksheet, start_row: int) -> None:
     """指定された行からセルのフォーマットと配置を適用
 
     Args:
@@ -53,7 +55,7 @@ def apply_cell_formats(worksheet, start_row):
                 cell.alignment = Alignment(horizontal='left', shrink_to_fit=True)
 
 
-def sort_excel_data(worksheet):
+def sort_excel_data(worksheet: Any) -> int:
     """Excelデータを預り日、診療科、患者IDでソート
 
     Args:
@@ -87,7 +89,7 @@ def sort_excel_data(worksheet):
         raise
 
 
-def bring_excel_to_front():
+def bring_excel_to_front() -> bool:
     """Excelウィンドウを最前面に表示
 
     Returns:
@@ -102,7 +104,7 @@ def bring_excel_to_front():
     return False
 
 
-def write_data_to_excel(excel_path, df):
+def write_data_to_excel(excel_path: str, df: pl.DataFrame) -> bool:
     """DataFrameのデータをExcelファイルに重複排除して書き込み
 
     既存データを確認して重複していないデータのみを追加。日付と患者IDの形式変換も実施
@@ -127,7 +129,7 @@ def write_data_to_excel(excel_path, df):
                              )
         return False
 
-    ws = wb.active
+    ws = cast(Worksheet, wb.active)
 
     last_row = get_last_row(ws)
 
@@ -136,7 +138,7 @@ def write_data_to_excel(excel_path, df):
     for row in range(2, last_row + 1):
         # 日付をYYYYMMDD形式の文字列として取得
         cell1 = ws.cell(row=row, column=1)
-        date_value = cell1.value if cell1 else None
+        date_value = cast(Any, cell1).value if cell1 else None
         if isinstance(date_value, datetime.datetime):
             date_str = date_value.strftime('%Y%m%d')
         else:
@@ -150,11 +152,11 @@ def write_data_to_excel(excel_path, df):
         cell6 = ws.cell(row=row, column=6)
         row_data = (
             date_str,  # 日付を8桁の数値文字列として保持
-            str(cell2.value or '') if cell2 else '',
-            str(cell3.value or '') if cell3 else '',
-            str(cell4.value or '') if cell4 else '',
-            str(cell5.value or '') if cell5 else '',
-            str(cell6.value or '') if cell6 else ''
+            str(cast(Any, cell2).value or '') if cell2 else '',
+            str(cast(Any, cell3).value or '') if cell3 else '',
+            str(cast(Any, cell4).value or '') if cell4 else '',
+            str(cast(Any, cell5).value or '') if cell5 else '',
+            str(cast(Any, cell6).value or '') if cell6 else ''
         )
         existing_data.add(row_data)
 
@@ -196,22 +198,23 @@ def write_data_to_excel(excel_path, df):
     for i, row in enumerate(unique_data):
         for j, value in enumerate(row):
             cell = ws.cell(row=last_row + 1 + i, column=j + 1)
+            typed_cell = cast(Any, cell)
 
             if j == 0:  # 日付列を日付型に変換
                 try:
                     date_value = datetime.datetime.strptime(value, '%Y-%m-%d')
-                    cell.value = date_value
-                    cell.number_format = 'yyyy/mm/dd'
+                    typed_cell.value = date_value
+                    typed_cell.number_format = 'yyyy/mm/dd'
                 except ValueError:
-                    cell.value = value
+                    typed_cell.value = value
             elif j == 1:  # 患者ID列
                 try:
-                    cell.value = int(value.replace(',', ''))
-                    cell.number_format = '0'
+                    typed_cell.value = int(value.replace(',', ''))
+                    typed_cell.number_format = '0'
                 except ValueError:
-                    cell.value = value
+                    typed_cell.value = value
             else:
-                cell.value = value if value is not None else ""
+                typed_cell.value = value if value is not None else ""
 
     apply_cell_formats(ws, last_row + 1)
 
@@ -229,7 +232,7 @@ def write_data_to_excel(excel_path, df):
         return False
 
 
-def clear_all_filters(worksheet, workbook):
+def clear_all_filters(worksheet: Any, workbook: Any) -> None:
     """ワークシートのフィルタをすべてクリアして解除"""
     try:
         is_shared = False
@@ -282,7 +285,7 @@ def clear_all_filters(worksheet, workbook):
         print(f"フィルタ解除中にエラーが発生しました: {str(e)}")
 
 
-def open_and_sort_excel(excel_path):
+def open_and_sort_excel(excel_path: str) -> None:
     """Excelファイルを開いてデータをソート、共有ボタンをクリック
 
     Args:

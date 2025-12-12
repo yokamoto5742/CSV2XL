@@ -7,7 +7,10 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLa
 class CoordinateTracker(QMainWindow):
     """マウス座標を表示するトラッキングウィンドウ"""
 
-    def __init__(self):
+    coord_label: QLabel
+    timer: QTimer
+
+    def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("画面の座標")
         self.setFixedSize(250, 100)
@@ -30,13 +33,13 @@ class CoordinateTracker(QMainWindow):
 
         QShortcut(QKeySequence(Qt.Key.Key_Space), self).activated.connect(self.copy_coordinates)
 
-    def update_coordinates(self):
+    def update_coordinates(self) -> None:
         """現在のマウス座標を取得して表示を更新"""
         x, y = pyautogui.position()
         self.coord_label.setText(f"座標: ({x}, {y})")
 
     @staticmethod
-    def copy_coordinates():
+    def copy_coordinates() -> None:
         """現在のマウス座標をクリップボードにコピー"""
         x, y = pyautogui.position()
         clipboard = QApplication.clipboard()

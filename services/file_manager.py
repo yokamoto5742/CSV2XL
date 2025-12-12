@@ -5,7 +5,7 @@ from pathlib import Path
 from utils.config_manager import ConfigManager
 
 
-def backup_excel_file(excel_path):
+def backup_excel_file(excel_path: str) -> None:
     """Excelファイルのバックアップを作成
 
     Args:
@@ -30,7 +30,7 @@ def backup_excel_file(excel_path):
         raise
 
 
-def cleanup_old_csv_files(processed_dir: Path):
+def cleanup_old_csv_files(processed_dir: Path) -> None:
     """指定した日数より前の処理済みCSVファイルを削除
 
     Args:
@@ -48,7 +48,7 @@ def cleanup_old_csv_files(processed_dir: Path):
                 print(f"ファイル削除中にエラーが発生しました: {file} - {str(e)}")
 
 
-def cleanup_old_backup_files():
+def cleanup_old_backup_files() -> None:
     """指定した日数より前のバックアップファイルを削除"""
     config = ConfigManager()
     backup_dir = Path(config.get_backup_path())
@@ -68,7 +68,7 @@ def cleanup_old_backup_files():
                 print(f"バックアップ削除中にエラーが発生しました: {file} - {str(e)}")
 
 
-def ensure_directories_exist():
+def ensure_directories_exist() -> None:
     """設定に指定されたディレクトリが存在しない場合は作成
 
     ダウンロード、バックアップ、処理済みCSVディレクトリを確認・作成
