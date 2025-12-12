@@ -31,15 +31,17 @@ def backup_excel_file(excel_path):
 
 
 def cleanup_old_csv_files(processed_dir: Path):
-    """3日以上前の処理済みCSVファイルを削除
+    """指定した日数より前の処理済みCSVファイルを削除
 
     Args:
         processed_dir: 処理済みCSVファイルの格納ディレクトリ
     """
+    config = ConfigManager()
+    retention_days = config.get_backup_retention_days()
     current_time = datetime.datetime.now()
     for file in processed_dir.glob("*.csv"):
         file_time = datetime.datetime.fromtimestamp(file.stat().st_mtime)
-        if (current_time - file_time).days >= 3:
+        if (current_time - file_time).days >= retention_days:
             try:
                 file.unlink()
             except Exception as e:
