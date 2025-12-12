@@ -1,4 +1,4 @@
-# チェンジログ
+# CHANGELOG.md
 
 このプロジェクトの全変更は、このファイルに記録されます。
 
@@ -6,6 +6,8 @@
 バージョン管理は[Semantic Versioning](https://semver.org/lang/ja/)に従っています。
 
 ## [未リリース (Unreleased)]
+
+## [1.1.3] - 2025-12-11
 
 ### 追加
 
@@ -50,6 +52,7 @@
 
 ---
 
-[未リリース (Unreleased)]: https://github.com/yokamura/CSV2XL/compare/v1.1.2...HEAD
+[未リリース (Unreleased)]: https://github.com/yokamura/CSV2XL/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/yokamura/CSV2XL/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/yokamura/CSV2XL/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/yokamura/CSV2XL/releases/tag/v1.1.1

@@ -15,8 +15,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = ConfigManager()
-        # アプリ起動時に古いバックアップファイルを削除
+
         cleanup_old_backup_files()
+
         self.tracker = CoordinateTracker()
         font = self.font()
         font.setPointSize(self.config.get_font_size())
@@ -25,7 +26,6 @@ class MainWindow(QMainWindow):
         self.setFixedSize(*window_size)
         self.setWindowTitle(f"CSV取込アプリ v{__version__}")
 
-        # メインウィジェット
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
 

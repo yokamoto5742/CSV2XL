@@ -8,7 +8,7 @@ class ProjectStructureGenerator:
     def __init__(self):
         self.ignore_patterns = {
             '__pycache__', '*.pyc', '*.pyo', '*.pyd', '.pytest_cache',
-            '*.egg-info', 'dist', 'build', '.tox', '.coverage', 'htmlcov','.claude',
+            '*.egg-info', 'dist', 'build', '.tox', '.coverage', 'htmlcov','.claude','.serena',
             '.venv', 'venv', '.env', 'env', 'tests','nul',
             '.vscode', '.idea', '*.swp', '*.swo', '*~',
             '.git', '.gitignore', '.hg', '.svn',

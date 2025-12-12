@@ -151,7 +151,7 @@ window_height = 330
 list = 訪問看護指示書,紹介状
 
 [ExcludeDoctors]
-list = 清水,菅原,寺井
+list = 田中,山田,中村
 
 [Paths]
 downloads_path = C:\Users\...\Downloads
@@ -198,7 +198,6 @@ __date__ = "2025-12-11"
 - **openpyxl** (3.1.5): Excel ファイル操作
 - **polars** (1.17.1): CSV/データ処理
 - **PyAutoGUI** (0.9.54): 自動化機能
-- **pyinstaller** (6.11.1): 実行ファイル生成
 
 ## CSVファイル名規則
 
@@ -223,7 +222,3 @@ XXXX_YYYYMMDDhhmmss.csv
 ## ライセンス
 
 このプロジェクトのライセンス条件については、`LICENSE` ファイルを参照してください。
-
-## サポート
-
-問題や機能リクエストについては、GitHubのIssuesセクションにお問い合わせください。

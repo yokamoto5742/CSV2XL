@@ -1,7 +1,7 @@
 ============================================================
 プロジェクト構造: CSV2XL
 パス: C:\Users\yokam\PycharmProjects\CSV2XL
-生成日時: 2025-09-02 15:23:24
+生成日時: 2025-12-12 12:55:00
 ============================================================
 
 └── CSV2XL
@@ -13,6 +13,7 @@
     │   ├── CSV2XL.ico
     │   └── CSV2XL.png
     ├── docs
+    │   ├── CHANGELOG.md
     │   ├── LICENSE
     │   └── README.md
     ├── scripts
@@ -32,4 +33,5 @@
     │   └── config_manager.py
     ├── requirements.txt
     ├── CLAUDE.md
-    └── main.py
+    ├── main.py
+    └── pyrightconfig.json
