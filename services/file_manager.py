@@ -6,7 +6,11 @@ from utils.config_manager import ConfigManager
 
 
 def backup_excel_file(excel_path):
-    """Excelファイルのバックアップを作成（医療文書担当一覧_yyyymmddhhmm.xlsm形式）"""
+    """Excelファイルのバックアップを作成（医療文書担当一覧_yyyymmddhhmm.xlsm形式）
+
+    Args:
+        excel_path: バックアップ対象のExcelファイルパス
+    """
     config = ConfigManager()
     backup_dir = Path(config.get_backup_path())
 
@@ -27,6 +31,11 @@ def backup_excel_file(excel_path):
 
 
 def cleanup_old_csv_files(processed_dir: Path):
+    """3日以上前の処理済みCSVファイルを削除
+
+    Args:
+        processed_dir: 処理済みCSVファイルの格納ディレクトリ
+    """
     current_time = datetime.datetime.now()
     for file in processed_dir.glob("*.csv"):
         file_time = datetime.datetime.fromtimestamp(file.stat().st_mtime)
@@ -58,6 +67,10 @@ def cleanup_old_backup_files():
 
 
 def ensure_directories_exist():
+    """設定に指定されたディレクトリが存在しない場合は作成
+
+    ダウンロード、バックアップ、処理済みCSVディレクトリを確認・作成
+    """
     config = ConfigManager()
     directories = [
         Path(config.get_downloads_path()),

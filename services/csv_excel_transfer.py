@@ -15,6 +15,7 @@ from utils.config_manager import ConfigManager
 
 
 def transfer_csv_to_excel():
+    """ダウンロードフォルダから最新のCSVファイルを読み込み、Excelファイルに転送"""
     try:
         config = ConfigManager()
         downloads_path = config.get_downloads_path()
@@ -37,7 +38,7 @@ def transfer_csv_to_excel():
         if write_data_to_excel(excel_path, df):
             process_completed_csv(latest_csv)
 
-            # Excelファイルを開く直前にバックアップを取る
+            # Excelファイルを開く直前にバックアップを取得
             backup_excel_file(excel_path)
             open_and_sort_excel(excel_path)
         

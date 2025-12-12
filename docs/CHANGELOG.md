@@ -7,6 +7,20 @@
 
 ## [未リリース (Unreleased)]
 
+### 追加
+
+- **Python型チェックツール**: CoverageおよびPython型チェック用ツールを追加（requirements.txt更新）
+
+### 変更
+
+- **pyrightconfig.json**: servicesディレクトリを型チェック対象に含める設定を更新
+- **excel_processor テスト**: pathlib.Pathを使用した実装に変更
+- **app/__init__.py**: バージョン情報と日付を更新
+
+### 修正
+
+- **excel_processor**: セル値取得時のNoneチェックを追加し、None値処理の堅牢性を向上
+
 ## [1.1.2] - 2025-12-10
 
 ### 追加

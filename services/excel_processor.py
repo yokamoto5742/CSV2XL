@@ -14,6 +14,14 @@ from utils.config_manager import ConfigManager
 
 
 def get_last_row(worksheet):
+    """ワークシートの最後のデータ行番号を取得
+
+    Args:
+        worksheet: openpyxlのワークシートオブジェクト
+
+    Returns:
+        最後のデータが存在する行番号
+    """
     last_row = 0
     for row in worksheet.iter_rows():
         if all(cell.value is None for cell in row):
@@ -23,9 +31,15 @@ def get_last_row(worksheet):
 
 
 def apply_cell_formats(worksheet, start_row):
+    """指定された行からセルのフォーマットと配置を適用
+
+    Args:
+        worksheet: openpyxlのワークシートオブジェクト
+        start_row: フォーマット開始行番号
+    """
     last_row = get_last_row(worksheet)
 
-    # A列からF列までの範囲を設定
+    # A～F列に対して、垂直中央配置を設定し、特定列の水平配置を調整
     for row in range(start_row, last_row + 1):
         for col in range(1, 7):
             cell = worksheet.cell(row=row, column=col)
@@ -40,6 +54,14 @@ def apply_cell_formats(worksheet, start_row):
 
 
 def sort_excel_data(worksheet):
+    """Excelデータを預り日、診療科、患者IDでソート
+
+    Args:
+        worksheet: win32comのワークシートオブジェクト
+
+    Returns:
+        ソート後の最終行番号
+    """
     try:
         last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
 
@@ -66,7 +88,11 @@ def sort_excel_data(worksheet):
 
 
 def bring_excel_to_front():
-    # Excelの表示を最前面にする（最大3回まで試行）
+    """Excelウィンドウを最前面に表示
+
+    Returns:
+        成功時はTrue、失敗時はFalse
+    """
     for _ in range(2):
         hwnd = win32gui.FindWindow("XLMAIN", None)
         if hwnd:
@@ -77,6 +103,17 @@ def bring_excel_to_front():
 
 
 def write_data_to_excel(excel_path, df):
+    """DataFrameのデータをExcelファイルに重複排除して書き込み
+
+    既存データを確認して重複していないデータのみを追加。日付と患者IDの形式変換も実施
+
+    Args:
+        excel_path: Excelファイルのパス
+        df: 書き込むpolarsのDataFrame
+
+    Returns:
+        成功時はTrue、失敗時はFalse
+    """
     if not Path(excel_path).exists() or not excel_path.endswith('.xlsm'):
         print(f"Excelファイルが見つかりません: {excel_path}")
         return False
@@ -92,12 +129,11 @@ def write_data_to_excel(excel_path, df):
 
     ws = wb.active
 
-    # 実際のデータが存在する最終行を取得
     last_row = get_last_row(ws)
 
-    # 既存データを保持するセットを作成（A列からF列までの値をキーとして使用）
+    # 既存データのセットを構築して重複チェック用のキーを作成（A～F列の値で識別）
     existing_data = set()
-    for row in range(2, last_row + 1):  # ヘッダー行をスキップ
+    for row in range(2, last_row + 1):
         # 日付をYYYYMMDD形式の文字列として取得
         cell1 = ws.cell(row=row, column=1)  # type: ignore[misc]
         date_value = cell1.value if cell1 else None
@@ -122,16 +158,16 @@ def write_data_to_excel(excel_path, df):
         )
         existing_data.add(row_data)
 
-    # CSVデータを文字列に変換
+    # DataFrameのすべての値を文字列に変換
     temp_df = df.select([
         pl.col('*').cast(pl.String)
     ])
     data_to_write = temp_df.to_numpy().tolist()
 
-    # 重複していないデータのみを抽出
+    # 既存データセットに存在しないデータのみを抽出
     unique_data = []
     for row in data_to_write:
-        # CSVの日付を8桁の数値文字列に変換
+        # 日付形式をYYYYMMDD形式に統一して比較
         csv_date = row[0]
         if isinstance(csv_date, str):
             try:
@@ -156,12 +192,12 @@ def write_data_to_excel(excel_path, df):
         if row_data not in existing_data:
             unique_data.append(row)
 
-    # 重複しないデータのみを書き込む
+    # 新規データを行ごとにセルに書き込み、必要に応じて型変換を実施
     for i, row in enumerate(unique_data):
         for j, value in enumerate(row):
             cell = ws.cell(row=last_row + 1 + i, column=j + 1)  # type: ignore[misc]
 
-            if j == 0:  # 日付列
+            if j == 0:  # 日付列を日付型に変換
                 try:
                     date_value = datetime.datetime.strptime(value, '%Y-%m-%d')
                     cell.value = date_value  # type: ignore[attr-defined]
@@ -194,10 +230,10 @@ def write_data_to_excel(excel_path, df):
 
 
 def clear_all_filters(worksheet, workbook):
-    """
-    すべてのフィルタを解除する
+    """ワークシートのフィルタをすべてクリアして解除
+
     共有ブックの場合はAutoFilterModeの変更ができないため、
-    ShowAllDataのみでフィルタ条件をクリアする
+    ShowAllDataとフィルタ条件の削除のみを実施
     """
     try:
         is_shared = False
@@ -251,9 +287,14 @@ def clear_all_filters(worksheet, workbook):
 
 
 def open_and_sort_excel(excel_path):
+    """Excelファイルを開いてデータをソート、共有ボタンをクリック
+
+    Args:
+        excel_path: Excelファイルのパス
+    """
     excel_path_obj = Path(excel_path)
 
-    # ファイルの存在確認
+    # ファイル存在チェック
     if not excel_path_obj.exists():
         QMessageBox.critical(None, "エラー", f"Excelファイルが見つかりません: {excel_path}")
         return
@@ -263,15 +304,14 @@ def open_and_sort_excel(excel_path):
     workbook = None
 
     try:
-        # Excel アプリケーションを起動
+        # Excelアプリケーションを起動
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True
         bring_excel_to_front()
 
-        # ファイルを開く
+        # Excelファイルを開く
         workbook = excel.Workbooks.Open(excel_path_str)
 
-        # workbook が正常に開かれたか確認
         if workbook is None:
             QMessageBox.critical(None, "エラー", "Excelファイルを開くことができませんでした。")
             return
@@ -281,14 +321,17 @@ def open_and_sort_excel(excel_path):
 
         worksheet = workbook.ActiveSheet
 
-        # フィルタがかかっていれば解除（共有ブック対応）
+        # フィルタがかかっていればクリア
         clear_all_filters(worksheet, workbook)
 
+        # データをソート
         sort_excel_data(worksheet)
 
+        # 最終行にカーソルを移動
         last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
         worksheet.Cells(last_row, 1).Select()
 
+        # 設定に従って共有ボタンをクリック
         config = ConfigManager()
         wait_time = config.get_share_button_wait_time()
         time.sleep(wait_time)

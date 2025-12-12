@@ -7,6 +7,14 @@ from utils.config_manager import ConfigManager
 
 
 def read_csv_with_encoding(file_path):
+    """複数のエンコーディングを試してCSVファイルを読み込む
+
+    Args:
+        file_path: CSVファイルのパス
+
+    Returns:
+        polarsのDataFrame、または読み込み失敗時はNone
+    """
     encodings = ['shift-jis', 'utf-8', 'cp932']
 
     for encoding in encodings:
@@ -39,8 +47,18 @@ def read_csv_with_encoding(file_path):
 
 
 def process_csv_data(df):
+    """CSVデータをExcel出力用に加工
+
+    列名の一意化、スペースと*の除去、指定列の削除、除外データのフィルタリング
+
+    Args:
+        df: 入力データフレーム
+
+    Returns:
+        加工済みのデータフレーム
+    """
     try:
-        # 列名を一意にする
+        # 列名を一意にするため、インデックスと元の名前を組み合わせて識別子を作成
         original_columns = df.columns
         unique_columns = []
         for i, col in enumerate(original_columns):
@@ -50,17 +68,17 @@ def process_csv_data(df):
             for old_name, new_name in zip(original_columns, unique_columns)
         ])
 
-        # 文書名(G列)と医師名（J列）のスペースと*を常に除去
+        # 文書名(G列)と医師名(J列)のスペースと全角スペース、*を除去
         df = df.with_columns([
             pl.col(df.columns[6]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
             pl.col(df.columns[9]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
         ])
 
-        # K列とI列を削除
+        # I列(8)とK列(10)を削除
         columns_to_keep = [i for i in range(len(df.columns)) if i not in [8, 10]]
         df = df.select([df.columns[i] for i in columns_to_keep])
 
-        # A列からC列を削除
+        # 最初の3列(A～C)を削除
         df = df.select(df.columns[3:])
 
         config = ConfigManager()
@@ -83,6 +101,14 @@ def process_csv_data(df):
 
 
 def convert_date_format(df):
+    """日付列をYYYYMMDD形式からDate型に変換
+
+    Args:
+        df: 入力データフレーム
+
+    Returns:
+        日付変換済みのデータフレーム
+    """
     try:
         date_col = df.columns[0]
         df = df.with_columns([
@@ -96,6 +122,11 @@ def convert_date_format(df):
 
 
 def process_completed_csv(csv_path: str):
+    """処理済みCSVファイルを指定ディレクトリに移動
+
+    Args:
+        csv_path: 処理済みCSVファイルのパス
+    """
     try:
         csv_file = Path(csv_path)
         if not csv_file.exists():
@@ -114,7 +145,16 @@ def process_completed_csv(csv_path: str):
 
 
 def find_latest_csv(downloads_path):
-    # ファイル名の形式が職員ID(3桁か4桁)_YYYYMMDDHHmmss.csvのファイルを検索
+    """ダウンロードフォルダから最新のCSVファイルを取得
+
+    職員ID_YYYYMMDDHHmmss形式のファイルを検索して、最も新しいものを返す
+
+    Args:
+        downloads_path: ダウンロードフォルダのパス
+
+    Returns:
+        最新CSVファイルのパス、または見つからない場合はNone
+    """
     csv_files = [f for f in Path(downloads_path).glob('*.csv')
                  if len(f.name.split('_')) == 2 and
                  (0 <= len(f.name.split('_')[0]) <= 5) and
