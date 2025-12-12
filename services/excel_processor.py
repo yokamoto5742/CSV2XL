@@ -135,7 +135,7 @@ def write_data_to_excel(excel_path, df):
     existing_data = set()
     for row in range(2, last_row + 1):
         # 日付をYYYYMMDD形式の文字列として取得
-        cell1 = ws.cell(row=row, column=1)  # type: ignore[misc]
+        cell1 = ws.cell(row=row, column=1)
         date_value = cell1.value if cell1 else None
         if isinstance(date_value, datetime.datetime):
             date_str = date_value.strftime('%Y%m%d')
@@ -143,11 +143,11 @@ def write_data_to_excel(excel_path, df):
             date_str = str(date_value or '')
 
         # A列からF列までの値を取得（日付は数値形式で保持）
-        cell2 = ws.cell(row=row, column=2)  # type: ignore[misc]
-        cell3 = ws.cell(row=row, column=3)  # type: ignore[misc]
-        cell4 = ws.cell(row=row, column=4)  # type: ignore[misc]
-        cell5 = ws.cell(row=row, column=5)  # type: ignore[misc]
-        cell6 = ws.cell(row=row, column=6)  # type: ignore[misc]
+        cell2 = ws.cell(row=row, column=2)
+        cell3 = ws.cell(row=row, column=3)
+        cell4 = ws.cell(row=row, column=4)
+        cell5 = ws.cell(row=row, column=5)
+        cell6 = ws.cell(row=row, column=6)
         row_data = (
             date_str,  # 日付を8桁の数値文字列として保持
             str(cell2.value or '') if cell2 else '',
@@ -195,23 +195,23 @@ def write_data_to_excel(excel_path, df):
     # 新規データを行ごとにセルに書き込み、必要に応じて型変換を実施
     for i, row in enumerate(unique_data):
         for j, value in enumerate(row):
-            cell = ws.cell(row=last_row + 1 + i, column=j + 1)  # type: ignore[misc]
+            cell = ws.cell(row=last_row + 1 + i, column=j + 1)
 
             if j == 0:  # 日付列を日付型に変換
                 try:
                     date_value = datetime.datetime.strptime(value, '%Y-%m-%d')
-                    cell.value = date_value  # type: ignore[attr-defined]
+                    cell.value = date_value
                     cell.number_format = 'yyyy/mm/dd'
                 except ValueError:
-                    cell.value = value  # type: ignore[attr-defined]
+                    cell.value = value
             elif j == 1:  # 患者ID列
                 try:
-                    cell.value = int(value.replace(',', ''))  # type: ignore[attr-defined]
+                    cell.value = int(value.replace(',', ''))
                     cell.number_format = '0'
                 except ValueError:
-                    cell.value = value  # type: ignore[attr-defined]
+                    cell.value = value
             else:
-                cell.value = value if value is not None else ""  # type: ignore[attr-defined]
+                cell.value = value if value is not None else ""
 
     apply_cell_formats(ws, last_row + 1)
 
@@ -230,11 +230,7 @@ def write_data_to_excel(excel_path, df):
 
 
 def clear_all_filters(worksheet, workbook):
-    """ワークシートのフィルタをすべてクリアして解除
-
-    共有ブックの場合はAutoFilterModeの変更ができないため、
-    ShowAllDataとフィルタ条件の削除のみを実施
-    """
+    """ワークシートのフィルタをすべてクリアして解除"""
     try:
         is_shared = False
         try:
@@ -247,7 +243,7 @@ def clear_all_filters(worksheet, workbook):
             print("オートフィルタは設定されていません")
             return
 
-        # フィルタ条件が適用されていれば、すべてのデータを表示
+        # フィルタ条件が適用されていればすべてのデータを表示
         try:
             if worksheet.FilterMode:
                 worksheet.ShowAllData()
@@ -255,7 +251,7 @@ def clear_all_filters(worksheet, workbook):
         except Exception as e:
             print(f"ShowAllData実行中にエラー: {str(e)}")
 
-        # 各列のフィルタを個別にクリアする（ShowAllDataが効かない場合の対策）
+        # 念のため各列のフィルタを個別にクリアする
         try:
             if worksheet.AutoFilterMode:
                 auto_filter = worksheet.AutoFilter
@@ -272,7 +268,7 @@ def clear_all_filters(worksheet, workbook):
         except Exception as e:
             print(f"個別フィルタクリア中にエラー: {str(e)}")
 
-        # 共有ブックでない場合のみ、オートフィルタ自体を解除
+        # 共有ブックでない場合のみオートフィルタ自体を解除
         if not is_shared:
             try:
                 worksheet.AutoFilterMode = False
@@ -294,7 +290,6 @@ def open_and_sort_excel(excel_path):
     """
     excel_path_obj = Path(excel_path)
 
-    # ファイル存在チェック
     if not excel_path_obj.exists():
         QMessageBox.critical(None, "エラー", f"Excelファイルが見つかりません: {excel_path}")
         return
@@ -304,7 +299,6 @@ def open_and_sort_excel(excel_path):
     workbook = None
 
     try:
-        # Excelアプリケーションを起動
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True
         bring_excel_to_front()
@@ -343,5 +337,5 @@ def open_and_sort_excel(excel_path):
         print(error_msg)
         QMessageBox.critical(None, "エラー", error_msg)
     finally:
-        # Excelは開いたままにするが、エラー処理は行う
+        # Excelは開いたままにするがエラー処理は行う
         pyautogui.hotkey('win', 'down')  # ウィンドウを最小化

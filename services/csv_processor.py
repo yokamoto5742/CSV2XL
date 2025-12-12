@@ -7,15 +7,8 @@ from utils.config_manager import ConfigManager
 
 
 def read_csv_with_encoding(file_path):
-    """複数のエンコーディングを試してCSVファイルを読み込む
-
-    Args:
-        file_path: CSVファイルのパス
-
-    Returns:
-        polarsのDataFrame、または読み込み失敗時はNone
-    """
-    encodings = ['shift-jis', 'utf-8', 'cp932']
+    """複数のエンコーディングを試してCSVファイルを読み込む"""
+    encodings = ['shift-jis', 'cp932', 'utf-8']
 
     for encoding in encodings:
         try:
@@ -48,17 +41,9 @@ def read_csv_with_encoding(file_path):
 
 def process_csv_data(df):
     """CSVデータをExcel出力用に加工
-
-    列名の一意化、スペースと*の除去、指定列の削除、除外データのフィルタリング
-
-    Args:
-        df: 入力データフレーム
-
-    Returns:
-        加工済みのデータフレーム
-    """
+    列名の一意化、スペースと*の除去、指定列の削除、除外データのフィルタリング"""
     try:
-        # 列名を一意にするため、インデックスと元の名前を組み合わせて識別子を作成
+        # 列名を一意にするためインデックスと元の名前を組み合わせて識別子を作成
         original_columns = df.columns
         unique_columns = []
         for i, col in enumerate(original_columns):
@@ -101,14 +86,7 @@ def process_csv_data(df):
 
 
 def convert_date_format(df):
-    """日付列をYYYYMMDD形式からDate型に変換
-
-    Args:
-        df: 入力データフレーム
-
-    Returns:
-        日付変換済みのデータフレーム
-    """
+    """日付列をYYYYMMDD形式からDate型に変換"""
     try:
         date_col = df.columns[0]
         df = df.with_columns([
@@ -122,11 +100,7 @@ def convert_date_format(df):
 
 
 def process_completed_csv(csv_path: str):
-    """処理済みCSVファイルを指定ディレクトリに移動
-
-    Args:
-        csv_path: 処理済みCSVファイルのパス
-    """
+    """処理済みCSVファイルを指定ディレクトリに移動"""
     try:
         csv_file = Path(csv_path)
         if not csv_file.exists():
@@ -147,7 +121,7 @@ def process_completed_csv(csv_path: str):
 def find_latest_csv(downloads_path):
     """ダウンロードフォルダから最新のCSVファイルを取得
 
-    職員ID_YYYYMMDDHHmmss形式のファイルを検索して、最も新しいものを返す
+    職員ID_YYYYMMDDHHmmss形式のファイルを検索して最も新しいものを返す
 
     Args:
         downloads_path: ダウンロードフォルダのパス

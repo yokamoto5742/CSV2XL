@@ -6,7 +6,7 @@ from utils.config_manager import ConfigManager
 
 
 def backup_excel_file(excel_path):
-    """Excelファイルのバックアップを作成（医療文書担当一覧_yyyymmddhhmm.xlsm形式）
+    """Excelファイルのバックアップを作成
 
     Args:
         excel_path: バックアップ対象のExcelファイルパス
@@ -47,7 +47,7 @@ def cleanup_old_csv_files(processed_dir: Path):
 
 
 def cleanup_old_backup_files():
-    """Config.iniで指定した日数より前のバックアップファイルを削除"""
+    """指定した日数より前のバックアップファイルを削除"""
     config = ConfigManager()
     backup_dir = Path(config.get_backup_path())
     retention_days = config.get_backup_retention_days()
