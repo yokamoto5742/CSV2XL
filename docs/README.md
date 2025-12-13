@@ -1,31 +1,23 @@
 # CSV2XL - 医療文書管理アプリケーション
 
-CSVからExcelへの自動転送を行うPyQt6ベースのデスクトップアプリケーションです。医療文書管理システム「Papyrus」からのCSVデータを効率的にExcelファイルに転記します。
-
-## バージョン情報
-
-- **現在のバージョン**: 1.1.3
-- **最終更新日**: 2025年12月11日
+医療文書管理システム「Papyrus」からのCSVデータを、PyQt6ベースのGUIで効率的にExcelファイルに自動転記するデスクトップアプリケーションです。
 
 ## 主な機能
 
-- **自動CSVファイル検出**: 最新のCSVファイルを自動で検出し処理
-- **エンコーディング自動判定**: Shift-JIS、UTF-8、CP932に対応
-- **日付形式自動変換**: CSV内の日付を目的地の形式に自動変換
-- **柔軟なフィルタリング**: 除外する文書名・医師名を設定可能
-- **重複チェック**: Excelへのデータ転記時に重複を自動検出
-- **自動バックアップ**: Excel処理前に自動でバックアップを作成
-- **UI カスタマイズ**: フォント、ウィンドウサイズを自由に調整
-- **座標トラッキングツール**: 自動化機能の座標設定をサポート
+- 最新のCSVファイルを自動検出・処理
+- 複数エンコーディング対応（Shift-JIS、UTF-8、CP932）
+- CSV内の日付を自動変換
+- 除外する文書名・医師名をカスタマイズ可能
+- Excelへの転記時に重複を自動検出
+- 処理前に自動バックアップを作成
+- UIのフォント・ウィンドウサイズをカスタマイズ
+- 自動化機能の座標設定をサポート
 
-## 動作環境
+## 前提条件
 
-| 項目 | 要件 |
-|------|------|
-| **OS** | Windows 11 |
-| **Python** | 3.11 以上 |
-| **メモリ** | 4GB 以上（推奨） |
-| **ディスク** | 100MB 以上の空き容量（推奨） |
+- **OS**: Windows 11
+- **Python**: 3.11 以上
+- **メモリ**: 4GB 以上（推奨）
 
 ## インストール
 
@@ -53,88 +45,94 @@ python main.py
 
 ## 使い方
 
+### アプリケーション起動
 ```bash
 python main.py
 ```
 
 ### 基本的なワークフロー
 
-1. **CSVファイルを準備**: Papyrusからダウンロードフォルダにエクスポート
-2. **CSVファイル取り込みボタンをクリック**: 以下を自動実行
+1. PapyrusからダウンロードフォルダにCSVファイルをエクスポート
+2. **CSVファイル取り込み**ボタンをクリック
+3. 以下が自動で実行されます：
    - 最新のCSVを検出・読み込み
    - データを処理・変換
    - Excelに転記
    - バックアップを作成
-   - 処理済みCSVを移動
-3. **Excelが自動で開く**: データ確認と追加操作が可能
+   - 処理済みCSVを指定フォルダに移動
+4. Excelファイルが自動で開きます
 
-### 設定メニュー
+### 設定項目
 
-| 項目 | 説明 | 既定値 |
-|------|------|--------|
-| **除外する文書名** | 転記対象外の文書種別（カンマ区切り） | - |
-| **除外する医師名** | 転記対象外の医師（カンマ区切り） | - |
-| **フォントサイズ** | UIのフォントサイズ | 11 |
-| **ウィンドウサイズ** | 幅×高さ | 350×330 |
-| **画面の座標表示** | マウス座標をリアルタイム表示し、自動化の座標を設定 | - |
-| **ダウンロードフォルダ** | CSVファイルのソースパス | - |
-| **Excelファイルパス** | データ転記先のExcelファイル | - |
-| **バックアップフォルダ** | バックアップの保存先 | - |
-| **処理済みCSVフォルダ** | 処理済みCSVの移動先 | - |
+**フィルタリング**:
+- 除外する文書名（カンマ区切り）
+- 除外する医師名（カンマ区切り）
 
-## プロジェクト構成
+**UI設定**:
+- フォントサイズ（既定値：11）
+- ウィンドウサイズ（既定値：350×330）
+
+**ファイル・フォルダパス**:
+- ダウンロードフォルダ（CSVファイルの検索元）
+- Excelファイルパス（データ転記先）
+- バックアップフォルダ
+- 処理済みCSVフォルダ
+
+**その他**:
+- 画面の座標表示：マウス座標をリアルタイム表示し、自動化機能の座標を取得
+
+## プロジェクト構造
 
 ```
 CSV2XL/
-├── app/                          # UIレイヤー
-│   ├── __init__.py              # バージョン情報
-│   ├── main_window.py           # メインウィンドウ
-│   └── dialogs.py               # 設定ダイアログ
-├── services/                    # ビジネスロジック
-│   ├── csv_excel_transfer.py   # 中核的なデータ転送処理
-│   ├── csv_processor.py        # CSV読込・処理
-│   ├── excel_processor.py      # Excel操作
-│   ├── file_manager.py         # ファイル・ディレクトリ管理
-│   └── coordinate_tracker.py   # 座標トラッキングUI
-├── utils/                       # ユーティリティ
-│   ├── config_manager.py       # 設定管理
-│   └── config.ini              # 設定ファイル
-├── scripts/                     # ビルド・補助スクリプト
-│   └── version_manager.py      # バージョン管理
-├── tests/                       # ユニットテスト
-├── main.py                      # エントリーポイント
-├── build.py                     # 実行ファイル生成
-└── requirements.txt             # 依存パッケージ
+├── app/                       # UI レイヤー
+│   ├── __init__.py           # バージョン情報
+│   ├── main_window.py        # メインウィンドウ
+│   └── dialogs.py            # 設定ダイアログ
+├── services/                 # ビジネスロジック
+│   ├── csv_excel_transfer.py # CSVからExcelへの転送処理
+│   ├── csv_processor.py      # CSV読込・エンコーディング判定
+│   ├── excel_processor.py    # Excel書込・ソート・フォーマット
+│   ├── file_manager.py       # バックアップ・クリーンアップ
+│   └── coordinate_tracker.py # 座標トラッキング機能
+├── utils/                    # ユーティリティ
+│   ├── config_manager.py     # 設定ファイル管理
+│   └── config.ini            # 設定ファイル
+├── scripts/                  # ビルド・補助スクリプト
+│   └── version_manager.py    # バージョン自動更新
+├── tests/                    # ユニットテスト
+├── main.py                   # エントリーポイント
+├── build.py                  # 実行ファイル生成スクリプト
+└── requirements.txt          # Python依存パッケージ
 ```
 
 ## 主要機能の詳細
 
 ### CSVデータ処理
 
-アプリケーションは以下のエンコーディングで自動判定してCSVを読み込みます：
-- Shift-JIS（日本語対応の標準エンコーディング）
-- UTF-8
-- CP932（Windows日本語）
+複数のエンコーディング対応により、様々な形式のCSVファイルを自動判定して読み込みます：
 
 ```python
 from services.csv_processor import read_csv_with_encoding, process_csv_data, convert_date_format
 
-# エンコーディング自動判定で読み込み、データ変換、日付形式の自動変換
+# エンコーディング自動判定（Shift-JIS → CP932 → UTF-8の順で試行）
 df = read_csv_with_encoding("path/to/file.csv")
+# 列名の一意化、スペース・特殊文字の除去
 df = process_csv_data(df)
+# 日付形式を自動変換
 df = convert_date_format(df)
 ```
 
-### Excel 操作と ファイル管理
+### Excel操作とファイル管理
 
 ```python
-from services.excel_processor import write_data_to_excel
+from services.excel_processor import write_data_to_excel, open_and_sort_excel
 from services.file_manager import backup_excel_file, cleanup_old_csv_files
 
-# Excel に書き込み（重複自動検出・セル書式の自動適用）
+# Excelに書込（重複自動検出・セル書式自動適用）
 success = write_data_to_excel("path/to/file.xlsx", df)
 
-# バックアップと古いファイルのクリーンアップ
+# バックアップ作成と古いファイル削除
 backup_excel_file("path/to/file.xlsx")
 cleanup_old_csv_files("processed_folder_path")
 ```
@@ -155,9 +153,12 @@ list = 田中,山田,中村
 
 [Paths]
 downloads_path = C:\Users\...\Downloads
-excel_path = C:/path/to/file.xlsm
-backup_path = C:/path/to/backup
+excel_path = C:\path\to\file.xlsm
+backup_path = C:\path\to\backup
 processed_path = C:\path\to\processed
+
+[FileRetention]
+backup_retention_days = 14
 
 [ButtonPosition]
 share_button_x = 1450
@@ -165,13 +166,20 @@ share_button_y = 160
 share_button_wait_time = 1
 ```
 
+- **Appearance**: UI外観設定（フォントサイズ、ウィンドウサイズ）
+- **ExcludeDocs/ExcludeDoctors**: フィルタリング対象
+- **Paths**: ファイル・フォルダパス
+- **FileRetention**: バックアップ・処理済みCSVの保持期間（日数）
+- **ButtonPosition**: 自動化機能の座標設定
+
 ## 開発情報
 
 ### テスト実行
 
 ```bash
-python -m pytest              # 全テストを実行
-python -m pytest tests/test_csv_processor.py  # 特定のテストファイルを実行
+python -m pytest                        # 全テストを実行
+python -m pytest tests/test_csv_processor.py  # 特定テストを実行
+python -m pytest --cov                 # カバレッジ付きで実行
 ```
 
 ### 実行ファイル生成
@@ -180,11 +188,11 @@ python -m pytest tests/test_csv_processor.py  # 特定のテストファイル�
 python build.py
 ```
 
-このコマンドはバージョンを自動更新してPyInstallerで実行ファイルを生成し、`dist/` フォルダに出力します。
+バージョンを自動更新し、PyInstallerで実行ファイルを生成します。出力先は `dist/` フォルダです。
 
 ### バージョン管理
 
-バージョン情報は `app/__init__.py` で管理され、ビルド時に自動更新されます：
+`app/__init__.py` で管理し、ビルド時に自動更新：
 ```python
 __version__ = "1.1.3"
 __date__ = "2025-12-11"
@@ -194,10 +202,11 @@ __date__ = "2025-12-11"
 
 詳細は `requirements.txt` を参照：
 
-- **PyQt6** (6.8.0): GUI フレームワーク
-- **openpyxl** (3.1.5): Excel ファイル操作
+- **PyQt6** (6.8.0): GUIフレームワーク
+- **openpyxl** (3.1.5): Excel操作
 - **polars** (1.17.1): CSV/データ処理
-- **PyAutoGUI** (0.9.54): 自動化機能
+- **PyAutoGUI** (0.9.54): UI自動化
+- **pyinstaller** (6.11.1): 実行ファイル生成
 
 ## CSVファイル名規則
 
@@ -205,19 +214,33 @@ __date__ = "2025-12-11"
 
 ```
 XXXX_YYYYMMDDhhmmss.csv
-
 例: 0001_20250101120000.csv
 ```
 
+最新のファイルが自動で検出されます。
+
 ## トラブルシューティング
 
-| 問題 | 解決方法 |
-|------|--------|
-| **CSVファイルが見つからない** | ダウンロードフォルダパスを確認。ファイル名が `XXXX_YYYYMMDDhhmmss.csv` 形式と一致することを確認 |
-| **エンコーディングエラー** | CSVを Shift-JIS または UTF-8 で再エクスポート。対応形式: Shift-JIS、UTF-8、CP932 |
-| **Excelが開けない** | ファイルパスが正しいか、他のアプリで開かれていないか確認。ファイルが存在するか確認 |
-| **座標設定が機能しない** | 「画面の座標表示」ツールで正確な座標を取得し、`config.ini` の `ButtonPosition` を更新 |
-| **パフォーマンス低下** | 処理済みCSVとバックアップフォルダをクリーンアップ。古いファイルを削除 |
+**CSVファイルが見つからない**
+- ダウンロードフォルダパスが `config.ini` で正しく設定されているか確認
+- ファイル名が `XXXX_YYYYMMDDhhmmss.csv` 形式と一致するか確認
+
+**エンコーディングエラー**
+- CSVを Shift-JIS または UTF-8 で再度エクスポート
+- 対応エンコーディング: Shift-JIS、CP932、UTF-8（この順で試行）
+
+**Excelが開けない / データが転記されない**
+- ファイルパスが正しいか、他のアプリで開かれていないか確認
+- ファイルが読み取り可能な状態か確認
+- Excelファイルのフォーマットが .xlsm であることを確認
+
+**座標設定が機能しない**
+- UI設定メニューの「画面の座標表示」ツールで正確な座標を取得
+- `config.ini` の `[ButtonPosition]` セクションを更新
+
+**パフォーマンス低下**
+- バックアップフォルダと処理済みCSVフォルダをクリーンアップ
+- 保持期間は `config.ini` の `backup_retention_days` で設定可能（デフォルト：14日）
 
 ## ライセンス
 

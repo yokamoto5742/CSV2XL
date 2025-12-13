@@ -77,9 +77,15 @@ class TestFileManager:
         # バックアップ処理が実行されたことを確認
         mock_copy2.assert_called_once()
 
+    @patch('services.file_manager.ConfigManager')
     @patch('services.file_manager.datetime.datetime')
-    def test_cleanup_old_csv_files(self, mock_dt):
+    def test_cleanup_old_csv_files(self, mock_dt, mock_config_manager):
         """古いCSVファイルの削除テスト"""
+        # ConfigManagerのモック設定（保持期間14日）
+        mock_config = MagicMock()
+        mock_config.get_backup_retention_days.return_value = 14
+        mock_config_manager.return_value = mock_config
+
         # 現在時刻を固定
         current_time = MagicMock()
         current_time.now = MagicMock(return_value=current_time)
@@ -105,10 +111,10 @@ class TestFileManager:
 
         # 日付比較の結果を設定
         diff1 = MagicMock()
-        diff1.days = 2  # 2日前（削除しない）
+        diff1.days = 10  # 10日前（削除しない）
 
         diff2 = MagicMock()
-        diff2.days = 4  # 4日前（削除する）
+        diff2.days = 15  # 15日前（削除する - 保持期間14日以上）
 
         # 引数に応じて異なる日付オブジェクトを返す
         def from_timestamp_side_effect(timestamp):
@@ -126,7 +132,11 @@ class TestFileManager:
         # 関数を実行
         cleanup_old_csv_files(processed_dir)
 
-        # 古いCSVファイル（3日以上前）のみが削除されることを確認
+        # ConfigManagerが呼ばれたことを確認
+        mock_config_manager.assert_called_once()
+        mock_config.get_backup_retention_days.assert_called_once()
+
+        # 古いCSVファイル（14日以上前）のみが削除されることを確認
         file1.unlink.assert_not_called()  # 新しいファイルは削除されない
         file2.unlink.assert_called_once()  # 古いファイルは削除される
         file3.unlink.assert_not_called()  # 非CSVファイルは削除されない
