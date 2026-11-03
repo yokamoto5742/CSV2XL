@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from PyQt6.QtWidgets import QMessageBox
-
 from services.csv_processor import (
     find_latest_csv,
     read_csv_with_encoding,
@@ -15,33 +13,30 @@ from utils.config_manager import ConfigManager
 
 
 def transfer_csv_to_excel() -> None:
-    """ダウンロードフォルダからCSVファイルを読み込みExcelファイルに転記"""
-    try:
-        config = ConfigManager()
-        downloads_path = config.get_downloads_path()
-        excel_path = config.get_excel_path()
-        processed_dir = Path(config.get_processed_path())
+    """ダウンロードフォルダからCSVファイルを読み込みExcelファイルに転記
 
-        ensure_directories_exist()
+    失敗時は例外を送出する(メッセージ表示は呼び出し側で行う)
+    """
+    config = ConfigManager()
+    downloads_path = config.get_downloads_path()
+    excel_path = config.get_excel_path()
+    processed_dir = Path(config.get_processed_path())
 
-        cleanup_old_csv_files(processed_dir)
+    ensure_directories_exist()
 
-        latest_csv = find_latest_csv(downloads_path)
-        if not latest_csv:
-            QMessageBox.warning(None, "警告", "ダウンロードフォルダにCSVファイルが見つかりません。")
-            return
+    cleanup_old_csv_files(processed_dir)
 
-        df = read_csv_with_encoding(latest_csv)
-        if df is None:
-            QMessageBox.warning(None, "警告", "CSVファイルの読み込みに失敗しました。")
-            return
-        df = process_csv_data(df)
-        df = convert_date_format(df)
+    latest_csv = find_latest_csv(downloads_path)
+    if not latest_csv:
+        raise FileNotFoundError("ダウンロードフォルダにCSVファイルが見つかりません。")
 
-        if write_data_to_excel(excel_path, df):
-            process_completed_csv(latest_csv)
-            backup_excel_file(excel_path)
-            open_and_sort_excel(excel_path)
+    df = read_csv_with_encoding(latest_csv)
+    if df is None:
+        raise ValueError("CSVファイルの読み込みに失敗しました。")
+    df = process_csv_data(df)
+    df = convert_date_format(df)
 
-    except Exception as e:
-        QMessageBox.critical(None, "エラー", f"CSVファイルの取り込み中にエラーが発生しました:\n{str(e)}")
+    write_data_to_excel(excel_path, df)
+    process_completed_csv(latest_csv)
+    backup_excel_file(excel_path)
+    open_and_sort_excel(excel_path)

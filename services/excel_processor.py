@@ -10,7 +10,6 @@ import win32gui
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 from openpyxl.worksheet.worksheet import Worksheet
-from PyQt6.QtWidgets import QMessageBox
 
 from utils.config_manager import ConfigManager
 
@@ -61,29 +60,24 @@ def sort_excel_data(worksheet: Any) -> int:
     Returns:
         ソート後の最終行番号
     """
-    try:
-        last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
+    last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
 
-        # ソートの範囲を設定
-        sort_range = worksheet.Range(f"A2:I{last_row}")
+    # ソートの範囲を設定
+    sort_range = worksheet.Range(f"A2:I{last_row}")
 
-        sort_range.Sort(
-            Key1=worksheet.Range("A2"),  # A列（預り日）
-            Order1=1,  # 1=昇順
-            Key2=worksheet.Range("E2"),  # E列（診療科）
-            Order2=1,  # 1=昇順
-            Key3=worksheet.Range("B2"),  # B列（患者ID）
-            Order3=1,  # 1=昇順
-            Header=1,  # 1=ヘッダーあり
-            OrderCustom=1,
-            MatchCase=False,
-            Orientation=1)
+    sort_range.Sort(
+        Key1=worksheet.Range("A2"),  # A列（預り日）
+        Order1=1,  # 1=昇順
+        Key2=worksheet.Range("E2"),  # E列（診療科）
+        Order2=1,  # 1=昇順
+        Key3=worksheet.Range("B2"),  # B列（患者ID）
+        Order3=1,  # 1=昇順
+        Header=1,  # 1=ヘッダーあり
+        OrderCustom=1,
+        MatchCase=False,
+        Orientation=1)
 
-        return last_row
-
-    except Exception as e:
-        print(f"ソート中にエラーが発生しました: {str(e)}")
-        raise
+    return last_row
 
 
 def bring_excel_to_front() -> bool:
@@ -101,7 +95,7 @@ def bring_excel_to_front() -> bool:
     return False
 
 
-def write_data_to_excel(excel_path: str, df: pl.DataFrame) -> bool:
+def write_data_to_excel(excel_path: str, df: pl.DataFrame) -> None:
     """DataFrameのデータをExcelファイルに重複排除して書き込み
 
     既存データを確認して重複していないデータのみを追加。日付と患者IDの形式変換も実施
@@ -109,9 +103,6 @@ def write_data_to_excel(excel_path: str, df: pl.DataFrame) -> bool:
     Args:
         excel_path: Excelファイルのパス
         df: 書き込むpolarsのDataFrame
-
-    Returns:
-        成功時はTrue、失敗時はFalse
     """
     if not Path(excel_path).exists():
         raise FileNotFoundError(f"Excelファイルが見つかりません: {excel_path}")
@@ -120,12 +111,10 @@ def write_data_to_excel(excel_path: str, df: pl.DataFrame) -> bool:
 
     try:
         wb = load_workbook(filename=excel_path, keep_vba=True)
-    except PermissionError:
-        QMessageBox.critical(None,
-                             "エラー",
-                             "Excelファイルが別のプロセスで開かれています。\nファイルを閉じてから再度実行してください。"
-                             )
-        return False
+    except PermissionError as e:
+        raise PermissionError(
+            "Excelファイルが別のプロセスで開かれています。\nファイルを閉じてから再度実行してください。"
+        ) from e
 
     ws = cast(Worksheet, wb.active)
 
@@ -218,16 +207,12 @@ def write_data_to_excel(excel_path: str, df: pl.DataFrame) -> bool:
 
     try:
         wb.save(excel_path)
+    except PermissionError as e:
+        raise PermissionError(
+            "Excelファイルが別のプロセスで開かれているため、保存できません。\nファイルを閉じてから再度実行してください。"
+        ) from e
+    finally:
         wb.close()
-        return True
-    except PermissionError:
-        QMessageBox.critical(None,
-                             "エラー",
-                             "Excelファイルが別のプロセスで開かれているため、保存できません。\nファイルを閉じてから再度実行してください。"
-                             )
-        if 'wb' in locals():
-            wb.close()
-        return False
 
 
 def clear_all_filters(worksheet: Any, workbook: Any) -> None:
@@ -292,50 +277,38 @@ def open_and_sort_excel(excel_path: str) -> None:
     excel_path_obj = Path(excel_path)
 
     if not excel_path_obj.exists():
-        QMessageBox.critical(None, "エラー", f"Excelファイルが見つかりません: {excel_path}")
-        return
+        raise FileNotFoundError(f"Excelファイルが見つかりません: {excel_path}")
 
-    excel_path_str = str(excel_path_obj.resolve())
-    excel = None
-    workbook = None
+    excel = win32com.client.Dispatch("Excel.Application")
+    excel.Visible = True
+    bring_excel_to_front()
 
-    try:
-        excel = win32com.client.Dispatch("Excel.Application")
-        excel.Visible = True
-        bring_excel_to_front()
+    # Excelファイルを開く
+    workbook = excel.Workbooks.Open(str(excel_path_obj.resolve()))
 
-        # Excelファイルを開く
-        workbook = excel.Workbooks.Open(excel_path_str)
+    if workbook is None:
+        raise RuntimeError("Excelファイルを開くことができませんでした。")
 
-        if workbook is None:
-            QMessageBox.critical(None, "エラー", "Excelファイルを開くことができませんでした。")
-            return
+    excel.WindowState = -4137  # xlMaximized
+    workbook.Windows(1).Activate()
 
-        excel.WindowState = -4137  # xlMaximized
-        workbook.Windows(1).Activate()
+    worksheet = workbook.ActiveSheet
 
-        worksheet = workbook.ActiveSheet
+    # フィルタがかかっていればクリア
+    clear_all_filters(worksheet, workbook)
 
-        # フィルタがかかっていればクリア
-        clear_all_filters(worksheet, workbook)
+    # データをソート
+    sort_excel_data(worksheet)
 
-        # データをソート
-        sort_excel_data(worksheet)
+    # 最終行にカーソルを移動
+    last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
+    worksheet.Cells(last_row, 1).Select()
 
-        # 最終行にカーソルを移動
-        last_row = worksheet.Cells(worksheet.Rows.Count, "A").End(-4162).Row
-        worksheet.Cells(last_row, 1).Select()
+    # 設定に従って共有ボタンをクリック
+    config = ConfigManager()
+    wait_time = config.get_share_button_wait_time()
+    time.sleep(wait_time)
+    share_x, share_y = config.get_share_button_position()
+    pyautogui.click(share_x, share_y)
 
-        # 設定に従って共有ボタンをクリック
-        config = ConfigManager()
-        wait_time = config.get_share_button_wait_time()
-        time.sleep(wait_time)
-        share_x, share_y = config.get_share_button_position()
-        pyautogui.click(share_x, share_y)
-
-        pyautogui.hotkey('win', 'down')  # ウィンドウを最小化
-
-    except Exception as e:
-        error_msg = f"Excelファイルの処理中にエラーが発生しました: {str(e)}"
-        print(error_msg)
-        QMessageBox.critical(None, "エラー", error_msg)
+    pyautogui.hotkey('win', 'down')  # ウィンドウを最小化

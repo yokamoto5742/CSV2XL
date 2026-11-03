@@ -22,12 +22,8 @@ def backup_excel_file(excel_path: str) -> None:
     backup_filename = f"医療文書担当一覧_{timestamp}.xlsm"
     backup_path = backup_dir / backup_filename
 
-    try:
-        shutil.copy2(excel_path, backup_path)
-        print(f"バックアップを作成しました: {backup_path}")
-    except Exception as e:
-        print(f"バックアップ作成中にエラーが発生しました: {str(e)}")
-        raise
+    shutil.copy2(excel_path, backup_path)
+    print(f"バックアップを作成しました: {backup_path}")
 
 
 def cleanup_old_csv_files(processed_dir: Path) -> None:
@@ -82,8 +78,4 @@ def ensure_directories_exist() -> None:
 
     for directory in directories:
         if not directory.exists():
-            try:
-                directory.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
-                print(f"ディレクトリの作成中にエラーが発生しました: {directory} - {str(e)}")
-                raise
+            directory.mkdir(parents=True, exist_ok=True)

@@ -1,23 +1,11 @@
-import sys
 import pytest
 import datetime
 from unittest.mock import patch, MagicMock
-
-from PyQt6.QtWidgets import QApplication
 
 from services.excel_processor import (
     get_last_row, apply_cell_formats,
     bring_excel_to_front, write_data_to_excel, open_and_sort_excel
 )
-
-
-@pytest.fixture
-def app():
-    """テスト用のQApplicationを提供するフィクスチャ"""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
-    yield app
 
 
 @pytest.fixture
@@ -131,7 +119,7 @@ class TestExcelProcessor:
     @patch('services.excel_processor.get_last_row')
     @patch('services.excel_processor.apply_cell_formats')
     def test_write_data_to_excel_success(self, mock_apply_formats, mock_get_last_row,
-                                         mock_load_workbook, mock_path, app):
+                                         mock_load_workbook, mock_path):
         """write_data_to_excel関数の成功ケースのテスト"""
         # モックの設定
         mock_path_instance = MagicMock()
@@ -173,10 +161,9 @@ class TestExcelProcessor:
         })
 
         # 関数実行
-        result = write_data_to_excel("test.xlsm", df)
+        write_data_to_excel("test.xlsm", df)
 
         # 結果を確認
-        assert result is True
         mock_path.assert_called_once_with("test.xlsm")
         mock_path_instance.exists.assert_called_once()
         mock_load_workbook.assert_called_once_with(filename="test.xlsm", keep_vba=True)
@@ -228,30 +215,36 @@ class TestExcelProcessor:
 
     @patch('services.excel_processor.Path')
     @patch('services.excel_processor.load_workbook')
-    @patch('services.excel_processor.QMessageBox.critical')
-    def test_write_data_to_excel_permission_error(self, mock_critical, mock_load_workbook, mock_path, app):
-        """write_data_to_excel関数のファイルオープンエラーケースのテスト"""
-        # モックの設定
-        mock_path_instance = MagicMock()
-        mock_path_instance.exists.return_value = True
-        mock_path.return_value = mock_path_instance
-
+    def test_write_data_to_excel_permission_error(self, mock_load_workbook, mock_path):
+        """Excelファイルを開けない場合は分かりやすいメッセージで例外を送出する"""
+        mock_path.return_value.exists.return_value = True
         mock_load_workbook.side_effect = PermissionError("ファイルが開かれています")
 
-        # 関数実行
         import polars as pl
         df = pl.DataFrame({"test": [1, 2, 3]})
-        result = write_data_to_excel("locked.xlsm", df)
+        with pytest.raises(PermissionError, match="別のプロセスで開かれています"):
+            write_data_to_excel("locked.xlsm", df)
 
-        # 結果を確認
-        assert result is False
-        mock_path.assert_called_once_with("locked.xlsm")
-        mock_path_instance.exists.assert_called_once()
         mock_load_workbook.assert_called_once_with(filename="locked.xlsm", keep_vba=True)
-        mock_critical.assert_called_once()
-        args = mock_critical.call_args[0]
-        assert "エラー" in args[1]
-        assert "別のプロセスで開かれています" in args[2]
+
+    @patch('services.excel_processor.Path')
+    @patch('services.excel_processor.load_workbook')
+    @patch('services.excel_processor.get_last_row', return_value=1)
+    @patch('services.excel_processor.apply_cell_formats')
+    def test_write_data_to_excel_save_error_closes_workbook(self, mock_apply_formats, mock_get_last_row,
+                                                            mock_load_workbook, mock_path):
+        """保存に失敗しても例外を送出してワークブックを閉じる"""
+        mock_path.return_value.exists.return_value = True
+        mock_workbook = MagicMock()
+        mock_workbook.save.side_effect = PermissionError("保存できません")
+        mock_load_workbook.return_value = mock_workbook
+
+        import polars as pl
+        df = pl.DataFrame({f"col_{i}": ["2023-01-01"] for i in range(6)})
+        with pytest.raises(PermissionError, match="保存できません"):
+            write_data_to_excel("locked.xlsm", df)
+
+        mock_workbook.close.assert_called_once()
 
     @patch('services.excel_processor.win32com.client.Dispatch')
     @patch('services.excel_processor.bring_excel_to_front')
@@ -311,17 +304,22 @@ class TestExcelProcessor:
     @patch('services.excel_processor.win32com.client.Dispatch')
     @patch('services.excel_processor.bring_excel_to_front')
     @patch('services.excel_processor.Path')
-    @patch('services.excel_processor.QMessageBox.critical')
     @patch('services.excel_processor.pyautogui.hotkey')
-    def test_open_and_sort_excel_error_does_not_minimize(self, mock_hotkey, mock_critical,
+    def test_open_and_sort_excel_error_does_not_minimize(self, mock_hotkey,
                                                          mock_path, mock_bring_front, mock_dispatch):
-        """エラー時は別ウィンドウを最小化しないことのテスト"""
+        """エラー時は例外を送出し、別ウィンドウを最小化しないことのテスト"""
         mock_path.return_value.exists.return_value = True
         mock_dispatch.return_value.Workbooks.Open.side_effect = Exception("開けません")
 
-        open_and_sort_excel("test.xlsm")
+        with pytest.raises(Exception, match="開けません"):
+            open_and_sort_excel("test.xlsm")
 
         mock_hotkey.assert_not_called()
+
+    def test_open_and_sort_excel_file_not_found(self, tmp_path):
+        """Excelファイルが無い場合は例外を送出する"""
+        with pytest.raises(FileNotFoundError, match="Excelファイルが見つかりません"):
+            open_and_sort_excel(str(tmp_path / "nonexistent.xlsm"))
 
     def test_sort_excel_data(self):
         """sort_excel_data関数のテスト"""

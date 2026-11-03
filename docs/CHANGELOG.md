@@ -13,6 +13,9 @@
 - **ConfigManager(M1)**: getter の既定値の二重定義を削除し、setter を `_set` に共通化。既定フォルダを `DEFAULT_BASE_DIR` 定数にまとめた
 - **ConfigManager(M2)**: カンマ区切りリストを読み書きする `get_list` / `set_list` を追加し、除外ダイアログが `config.config` を直接触らないようにした。`ExcludeItemDialog` の引数 `item_label` を `title` に統合
 - **ConfigManager**: 保存失敗時の例外メッセージを `Failed to save config` に修正
+- **エラー処理(M3)**: services 層から `QMessageBox` を除き、失敗時は例外を送出するように変更。エラー表示は `MainWindow.import_csv` の 1 箇所に集約（CSV 未検出やファイルロック時も同じエラーダイアログで表示）
+- **エラー処理(M4)**: ログ出力して再送出するだけの `try/except` を `process_csv_data` / `process_completed_csv` / `sort_excel_data` / `backup_excel_file` / `ensure_directories_exist` から削除
+- **テスト**: `test_csv_processor.py` にあった `transfer_csv_to_excel` の重複テストを削除（`test_csv_excel_transfer.py` に集約）
 
 ### 削除
 

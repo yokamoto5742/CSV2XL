@@ -43,47 +43,42 @@ def read_csv_with_encoding(file_path: str) -> Optional[pl.DataFrame]:
 def process_csv_data(df: pl.DataFrame) -> pl.DataFrame:
     """CSVデータをExcel出力用に加工
     列名の一意化、スペースと*の除去、指定列の削除、除外データのフィルタリング"""
-    try:
-        # 列名を一意にするためインデックスと元の名前を組み合わせて識別子を作成
-        original_columns = df.columns
-        unique_columns = []
-        for i, col in enumerate(original_columns):
-            unique_columns.append(f"col_{i}_{col}")
-        df = df.select([
-            pl.col(old_name).alias(new_name)
-            for old_name, new_name in zip(original_columns, unique_columns)
-        ])
+    # 列名を一意にするためインデックスと元の名前を組み合わせて識別子を作成
+    original_columns = df.columns
+    unique_columns = []
+    for i, col in enumerate(original_columns):
+        unique_columns.append(f"col_{i}_{col}")
+    df = df.select([
+        pl.col(old_name).alias(new_name)
+        for old_name, new_name in zip(original_columns, unique_columns)
+    ])
 
-        # 文書名(G列)と医師名(J列)のスペースと全角スペース、*を除去
-        df = df.with_columns([
-            pl.col(df.columns[6]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
-            pl.col(df.columns[9]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
-        ])
+    # 文書名(G列)と医師名(J列)のスペースと全角スペース、*を除去
+    df = df.with_columns([
+        pl.col(df.columns[6]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
+        pl.col(df.columns[9]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
+    ])
 
-        # I列(8)とK列(10)を削除
-        columns_to_keep = [i for i in range(len(df.columns)) if i not in [8, 10]]
-        df = df.select([df.columns[i] for i in columns_to_keep])
+    # I列(8)とK列(10)を削除
+    columns_to_keep = [i for i in range(len(df.columns)) if i not in [8, 10]]
+    df = df.select([df.columns[i] for i in columns_to_keep])
 
-        # 最初の3列(A～C)を削除
-        df = df.select(df.columns[3:])
+    # 最初の3列(A～C)を削除
+    df = df.select(df.columns[3:])
 
-        config = ConfigManager()
-        exclude_docs = config.get_exclude_docs()
-        exclude_doctors = config.get_exclude_doctors()
+    config = ConfigManager()
+    exclude_docs = config.get_exclude_docs()
+    exclude_doctors = config.get_exclude_doctors()
 
-        if exclude_docs:
-            for doc in exclude_docs:
-                df = df.filter(~pl.col(df.columns[3]).cast(pl.String).str.contains(doc, literal=True))
+    if exclude_docs:
+        for doc in exclude_docs:
+            df = df.filter(~pl.col(df.columns[3]).cast(pl.String).str.contains(doc, literal=True))
 
-        if exclude_doctors:
-            for doctor in exclude_doctors:
-                df = df.filter(~pl.col(df.columns[5]).cast(pl.String).str.contains(doctor, literal=True))
+    if exclude_doctors:
+        for doctor in exclude_doctors:
+            df = df.filter(~pl.col(df.columns[5]).cast(pl.String).str.contains(doctor, literal=True))
 
-        return df
-
-    except Exception as e:
-        print(f"データ処理中にエラーが発生しました: {str(e)}")
-        raise
+    return df
 
 
 def convert_date_format(df: pl.DataFrame) -> pl.DataFrame:
@@ -102,21 +97,16 @@ def convert_date_format(df: pl.DataFrame) -> pl.DataFrame:
 
 def process_completed_csv(csv_path: str) -> None:
     """処理済みCSVファイルを指定ディレクトリに移動"""
-    try:
-        csv_file = Path(csv_path)
-        if not csv_file.exists():
-            return
+    csv_file = Path(csv_path)
+    if not csv_file.exists():
+        return
 
-        config = ConfigManager()
-        processed_dir = Path(config.get_processed_path())
-        processed_dir.mkdir(exist_ok=True, parents=True)
+    config = ConfigManager()
+    processed_dir = Path(config.get_processed_path())
+    processed_dir.mkdir(exist_ok=True, parents=True)
 
-        new_path = processed_dir / csv_file.name
-        shutil.move(str(csv_file), str(new_path))
-
-    except Exception as e:
-        print(f"CSVファイルの処理中にエラーが発生しました: {str(e)}")
-        raise
+    new_path = processed_dir / csv_file.name
+    shutil.move(str(csv_file), str(new_path))
 
 
 def find_latest_csv(downloads_path: str) -> Optional[str]:
