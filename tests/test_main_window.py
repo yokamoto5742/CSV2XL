@@ -52,6 +52,13 @@ def backup_config():
         config.write(f)
 
 
+@pytest.fixture
+def db_connect():
+    """本物の DB に接続しないよう connect をモックする"""
+    with patch('app.main_window.connect') as mock_connect:
+        yield mock_connect
+
+
 class TestMainWindow:
     def test_init(self, app, backup_config):
         """MainWindowの初期化テスト"""
@@ -77,62 +84,82 @@ class TestMainWindow:
         layout = central_widget.layout()
         assert layout is not None
 
-        # 少なくとも7つのウィジェットがあることを確認
-        # (タイトルラベル、CSVボタン、設定ラベル、除外文書ボタン、除外医師ボタン、外観ボタン、座標ボタン、フォルダボタン、閉じるボタン)
-        assert layout.count() >= 9
+        # (タイトルラベル、CSVボタン、担当一覧ボタン、設定ラベル、除外文書ボタン、除外医師ボタン、
+        #  担当者名ボタン、外観ボタン、フォルダボタン、閉じるボタン)
+        assert layout.count() == 10
 
-    @patch('app.main_window.transfer_csv_to_excel')
-    def test_import_csv_success(self, mock_transfer, app, backup_config):
-        """CSVインポート成功のテスト"""
+        # 起動時には DB に接続しない
+        assert window.connection is None
+
+    @patch('app.main_window.MainWindow.show_document_window')
+    @patch('app.main_window.QMessageBox.information')
+    @patch('app.main_window.import_csv_to_database', return_value=3)
+    def test_import_csv_success(self, mock_import, mock_info, mock_show, app, backup_config, db_connect):
+        """CSVインポート成功時は件数を表示して担当一覧を開く"""
         window = MainWindow()
 
         window.import_csv()
 
-        # transfer_csv_to_excel関数が呼ばれたことを確認
-        mock_transfer.assert_called_once()
+        mock_import.assert_called_once_with(db_connect.return_value)
+        assert "3件" in mock_info.call_args[0][2]
+        mock_show.assert_called_once()
 
-    @patch('app.main_window.transfer_csv_to_excel')
+    @patch('app.main_window.import_csv_to_database')
     @patch('app.main_window.QMessageBox.critical')
-    def test_import_csv_error(self, mock_critical, mock_transfer, app, backup_config):
+    def test_import_csv_error(self, mock_critical, mock_import, app, backup_config, db_connect):
         """CSVインポートエラーのテスト"""
-        # エラーをシミュレート
-        mock_transfer.side_effect = Exception("テストエラー")
+        mock_import.side_effect = Exception("テストエラー")
 
         window = MainWindow()
         window.import_csv()
 
-        # エラーメッセージが表示されたことを確認
         mock_critical.assert_called_once()
         args = mock_critical.call_args[0]
         assert args[0] == window  # 親ウィンドウ
         assert args[1] == "エラー"  # タイトル
         assert "テストエラー" in args[2]  # エラーメッセージ
 
-    @patch('app.main_window.ExcludeDocsDialog')
-    def test_show_exclude_docs_dialog(self, mock_dialog, app, backup_config):
-        """除外文書ダイアログ表示テスト"""
-        mock_instance = MagicMock()
-        mock_dialog.return_value = mock_instance
-
+    def test_connection_is_reused(self, app, backup_config, db_connect):
+        """DB には1回だけ接続し、閉じたら次は接続し直す"""
         window = MainWindow()
-        window.show_exclude_docs_dialog()
 
-        # ダイアログが作成され、execが呼ばれたことを確認
-        mock_dialog.assert_called_once_with(window)
-        mock_instance.exec.assert_called_once()
+        first = window.get_connection()
+        assert window.get_connection() is first
+        db_connect.assert_called_once()
 
-    @patch('app.main_window.ExcludeDoctorsDialog')
-    def test_show_exclude_doctors_dialog(self, mock_dialog, app, backup_config):
-        """除外医師ダイアログ表示テスト"""
-        mock_instance = MagicMock()
-        mock_dialog.return_value = mock_instance
+        window.close_connection()
+        window.get_connection()
+        assert db_connect.call_count == 2
 
+    @patch('app.main_window.DocumentListWindow')
+    def test_show_document_window(self, mock_window_class, app, backup_config, db_connect):
+        """初回は担当一覧を作って表示し、2回目は読み直す"""
         window = MainWindow()
-        window.show_exclude_doctors_dialog()
 
-        # ダイアログが作成され、execが呼ばれたことを確認
-        mock_dialog.assert_called_once_with(window)
-        mock_instance.exec.assert_called_once()
+        window.show_document_window()
+        window.show_document_window()
+
+        mock_window_class.assert_called_once_with(db_connect.return_value, window)
+        document_window = mock_window_class.return_value
+        document_window.load_initial.assert_called_once()
+        document_window.reload.assert_called_once()
+        assert document_window.showMaximized.call_count == 2
+
+    @pytest.mark.parametrize("method_name, dialog_name", [
+        ("show_exclude_docs_dialog", "ExcludeDocsDialog"),
+        ("show_exclude_doctors_dialog", "ExcludeDoctorsDialog"),
+        ("show_staff_names_dialog", "StaffNamesDialog"),
+    ])
+    def test_show_list_dialogs(self, method_name, dialog_name, app, backup_config, db_connect):
+        """リスト編集ダイアログを DB のリポジトリ付きで開く"""
+        with patch(f'app.main_window.{dialog_name}') as mock_dialog:
+            window = MainWindow()
+            getattr(window, method_name)()
+
+        repository, parent = mock_dialog.call_args[0]
+        assert repository.connection is db_connect.return_value
+        assert parent is window
+        mock_dialog.return_value.exec.assert_called_once()
 
     @patch('app.main_window.AppearanceDialog')
     def test_show_appearance_dialog(self, mock_dialog, app, backup_config):
@@ -159,22 +186,6 @@ class TestMainWindow:
         # ダイアログが作成され、execが呼ばれたことを確認
         mock_dialog.assert_called_once_with(window)
         mock_instance.exec.assert_called_once()
-
-    def test_show_coordinate_tracker(self, app, backup_config):
-        """座標トラッカー表示テスト"""
-        window = MainWindow()
-
-        # trackerの初期状態を確認
-        tracker = window.tracker
-        assert tracker is not None
-
-        # showメソッドをモック化
-        tracker.show = MagicMock()
-
-        window.show_coordinate_tracker()
-
-        # showメソッドが呼ばれたことを確認
-        tracker.show.assert_called_once()
 
     @patch('app.main_window.QMainWindow.close')
     def test_close_button(self, mock_close, app, backup_config):

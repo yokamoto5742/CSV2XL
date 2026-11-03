@@ -4,6 +4,7 @@ from typing import Optional
 
 import polars as pl
 
+from services.document_repository import NewDocument
 from utils.config_manager import ConfigManager
 
 # 元CSVの列位置(0始まり)
@@ -45,7 +46,7 @@ def read_csv_with_encoding(file_path: str) -> Optional[pl.DataFrame]:
     return None
 
 
-def process_csv_data(df: pl.DataFrame) -> pl.DataFrame:
+def process_csv_data(df: pl.DataFrame, exclude_docs: list[str], exclude_doctors: list[str]) -> pl.DataFrame:
     """CSVデータをExcel出力用に加工
     列名の一意化、スペースと*の除去、指定列の削除、除外データのフィルタリング"""
     # 列名を一意にするためインデックスと元の名前を組み合わせて識別子を作成
@@ -60,10 +61,9 @@ def process_csv_data(df: pl.DataFrame) -> pl.DataFrame:
         doctor_col.cast(pl.String).str.replace_all(r'[\s*　]', ''),
     ])
 
-    config = ConfigManager()
-    for doc in config.get_exclude_docs():
+    for doc in exclude_docs:
         df = df.filter(~doc_col.str.contains(doc, literal=True))
-    for doctor in config.get_exclude_doctors():
+    for doctor in exclude_doctors:
         df = df.filter(~doctor_col.str.contains(doctor, literal=True))
 
     columns_to_keep = [name for i, name in enumerate(df.columns) if i not in DROP_COLS]
@@ -82,6 +82,22 @@ def convert_date_format(df: pl.DataFrame) -> pl.DataFrame:
     except Exception as e:
         print(f"日付変換中にエラーが発生しましたが、処理を継続します: {str(e)}")
         return df
+
+
+def dataframe_to_documents(df: pl.DataFrame) -> list[NewDocument]:
+    """加工済みの DataFrame(預り日・患者ID・患者名・文書名・診療科・医師名の順)を取り込み用の行にする"""
+    rows = df.select(pl.all().cast(pl.String)).rows()
+    return [
+        NewDocument(
+            received_date=row[0] or '',
+            patient_id=int(row[1]),
+            patient_name=row[2] or '',
+            document_name=row[3] or '',
+            department=row[4] or '',
+            doctor_name=row[5] or '',
+        )
+        for row in rows
+    ]
 
 
 def process_completed_csv(csv_path: str) -> None:

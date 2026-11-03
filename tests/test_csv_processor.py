@@ -1,13 +1,17 @@
-from unittest.mock import patch, MagicMock
+import datetime
 
 import polars as pl
 
-from services.csv_processor import process_csv_data
+from services.csv_processor import dataframe_to_documents, process_csv_data
+from services.document_repository import NewDocument
+
+DOC_COL_IDX = 3  # 処理後の col_6_文書名(元G列)
+DOCTOR_COL_IDX = 5  # 処理後の col_9_医師名(元J列)
 
 
 class TestCsvProcessor:
     """CSV処理機能のテストクラス"""
-    
+
     def create_test_dataframe(self):
         """テスト用のDataFrameを作成（実際のCSVの11列構造を模擬）"""
         return pl.DataFrame({
@@ -23,163 +27,85 @@ class TestCsvProcessor:
             "医師名": ["田中 医師 *", "除外 医師", "佐藤医師", "鈴木 医師"],  # J列：スペースとアスタリスクを含むデータ
             "col10": ["削除予定", "削除予定", "削除予定", "削除予定"]  # K列（インデックス10）削除される
         })
-    
-    @patch('services.csv_processor.ConfigManager')
-    def test_process_csv_data_drops_columns(self, mock_config_manager):
-        """A～C列・I列・K列が削除され、残りの列が元の順で並ぶことのテスト"""
-        mock_config_manager.return_value.get_exclude_docs.return_value = []
-        mock_config_manager.return_value.get_exclude_doctors.return_value = []
 
-        result_df = process_csv_data(self.create_test_dataframe())
+    def column_values(self, df: pl.DataFrame, index: int) -> list[str]:
+        return df[df.columns[index]].to_list()
+
+    def test_process_csv_data_drops_columns(self):
+        """A～C列・I列・K列が削除され、残りの列が元の順で並ぶことのテスト"""
+        result_df = process_csv_data(self.create_test_dataframe(), [], [])
 
         assert result_df.columns == [
             "col_3_col3", "col_4_col4", "col_5_col5", "col_6_文書名", "col_7_日付", "col_9_医師名"
         ]
 
-    @patch('services.csv_processor.ConfigManager')
-    def test_process_csv_data_no_exclusions(self, mock_config_manager):
+    def test_process_csv_data_no_exclusions(self):
         """除外設定なしでのCSVデータ処理テスト"""
-        # ConfigManagerのモック設定
-        mock_config = MagicMock()
-        mock_config.get_exclude_docs.return_value = []
-        mock_config.get_exclude_doctors.return_value = []
-        mock_config_manager.return_value = mock_config
-        
-        # テストデータ作成
-        df = self.create_test_dataframe()
-        
-        # 処理実行
-        result_df = process_csv_data(df)
-        
-        # 結果確認（除外されていないこと）
+        result_df = process_csv_data(self.create_test_dataframe(), [], [])
+
         assert len(result_df) == 4  # 全ての行が残る
-        # 処理後は文書名がcol_6_文書名（インデックス3）、医師名がcol_9_医師名（インデックス5）
-        doc_col_idx = 3  # col_6_文書名（元G列）
-        doctor_col_idx = 5  # col_9_医師名（元J列）
+        doc_values = self.column_values(result_df, DOC_COL_IDX)
+        doctor_values = self.column_values(result_df, DOCTOR_COL_IDX)
         # スペースとアスタリスクが除去されることを確認
-        doc_values = result_df[result_df.columns[doc_col_idx]].to_list()
-        doctor_values = result_df[result_df.columns[doctor_col_idx]].to_list()
-        assert "除外文書" in doc_values  # *が除去された後
-        assert "除外医師" in doctor_values  # スペースが除去された後
-        # 具体的な除去が行われていることを確認
-        assert "田中医師" in doctor_values  # スペースとアスタリスクが除去されている
-        assert "検査結果A" in doc_values  # スペースとアスタリスクが除去されている
-    
-    @patch('services.csv_processor.ConfigManager')
-    def test_process_csv_data_with_doc_exclusions(self, mock_config_manager):
+        assert "除外文書" in doc_values
+        assert "除外医師" in doctor_values
+        assert "田中医師" in doctor_values
+        assert "検査結果A" in doc_values
+
+    def test_process_csv_data_with_doc_exclusions(self):
         """文書除外設定ありでのCSVデータ処理テスト"""
-        # ConfigManagerのモック設定
-        mock_config = MagicMock()
-        mock_config.get_exclude_docs.return_value = ["除外文書"]
-        mock_config.get_exclude_doctors.return_value = []
-        mock_config_manager.return_value = mock_config
-        
-        # テストデータ作成
-        df = self.create_test_dataframe()
-        
-        # 処理実行
-        result_df = process_csv_data(df)
-        
-        # 結果確認（除外文書の行が削除されていること）
+        result_df = process_csv_data(self.create_test_dataframe(), ["除外文書"], [])
+
         assert len(result_df) == 3
-        doc_col_idx = 3  # col_6_文書名（元G列）
-        doctor_col_idx = 5  # col_9_医師名（元J列）
-        assert "除外文書" not in result_df[result_df.columns[doc_col_idx]].to_list()
-        assert "除外医師" in result_df[result_df.columns[doctor_col_idx]].to_list()  # 医師は残る
-    
-    @patch('services.csv_processor.ConfigManager')
-    def test_process_csv_data_with_doctor_exclusions(self, mock_config_manager):
+        assert "除外文書" not in self.column_values(result_df, DOC_COL_IDX)
+        assert "除外医師" in self.column_values(result_df, DOCTOR_COL_IDX)  # 医師は残る
+
+    def test_process_csv_data_with_doctor_exclusions(self):
         """医師除外設定ありでのCSVデータ処理テスト"""
-        # ConfigManagerのモック設定
-        mock_config = MagicMock()
-        mock_config.get_exclude_docs.return_value = []
-        mock_config.get_exclude_doctors.return_value = ["除外医師"]
-        mock_config_manager.return_value = mock_config
-        
-        # テストデータ作成
-        df = self.create_test_dataframe()
-        
-        # 処理実行
-        result_df = process_csv_data(df)
-        
-        # 結果確認（除外医師の行が削除されていること）
+        result_df = process_csv_data(self.create_test_dataframe(), [], ["除外医師"])
+
         assert len(result_df) == 3
-        doc_col_idx = 3  # col_6_文書名（元G列）
-        doctor_col_idx = 5  # col_9_医師名（元J列）
-        assert "除外文書" in result_df[result_df.columns[doc_col_idx]].to_list()  # 文書は残る
-        assert "除外医師" not in result_df[result_df.columns[doctor_col_idx]].to_list()
-    
-    @patch('services.csv_processor.ConfigManager')
-    def test_process_csv_data_with_both_exclusions(self, mock_config_manager):
+        assert "除外文書" in self.column_values(result_df, DOC_COL_IDX)  # 文書は残る
+        assert "除外医師" not in self.column_values(result_df, DOCTOR_COL_IDX)
+
+    def test_process_csv_data_with_both_exclusions(self):
         """文書と医師両方の除外設定ありでのCSVデータ処理テスト"""
-        # ConfigManagerのモック設定
-        mock_config = MagicMock()
-        mock_config.get_exclude_docs.return_value = ["除外文書"]
-        mock_config.get_exclude_doctors.return_value = ["除外医師"]
-        mock_config_manager.return_value = mock_config
-        
-        # テストデータ作成
-        df = self.create_test_dataframe()
-        
-        # 処理実行
-        result_df = process_csv_data(df)
-        
-        # 結果確認（両方の除外条件に該当する行が削除されていること）
+        result_df = process_csv_data(self.create_test_dataframe(), ["除外文書"], ["除外医師"])
+
         assert len(result_df) == 2
-        doc_col_idx = 3  # col_6_文書名（元G列）
-        doctor_col_idx = 5  # col_9_医師名（元J列）
-        assert "除外文書" not in result_df[result_df.columns[doc_col_idx]].to_list()
-        assert "除外医師" not in result_df[result_df.columns[doctor_col_idx]].to_list()
-    
-    @patch('services.csv_processor.ConfigManager')
-    def test_process_csv_data_partial_match_exclusions(self, mock_config_manager):
+        assert "除外文書" not in self.column_values(result_df, DOC_COL_IDX)
+        assert "除外医師" not in self.column_values(result_df, DOCTOR_COL_IDX)
+
+    def test_process_csv_data_partial_match_exclusions(self):
         """部分一致での除外機能テスト"""
-        # ConfigManagerのモック設定
-        mock_config = MagicMock()
-        mock_config.get_exclude_docs.return_value = ["検査"]  # 「検査結果 A」に部分一致
-        mock_config.get_exclude_doctors.return_value = ["田中"]  # 「田中医師」に部分一致
-        mock_config_manager.return_value = mock_config
-        
-        # テストデータ作成
-        df = self.create_test_dataframe()
-        
-        # 処理実行
-        result_df = process_csv_data(df)
-        
-        # 結果確認（部分一致で除外されていること）
-        assert len(result_df) == 3  # "検査結果A"（スペース・*除去後）と"田中医師"の行が除外される
-        doc_col_idx = 3  # col_6_文書名（元G列）
-        doctor_col_idx = 5  # col_9_医師名（元J列）
-        doc_list = result_df[result_df.columns[doc_col_idx]].to_list()
-        doctor_list = result_df[result_df.columns[doctor_col_idx]].to_list()
-        
-        # 「検査」を含む文書が除外されていることを確認
-        assert not any("検査" in doc for doc in doc_list)
-        # 「田中」を含む医師が除外されていることを確認
-        assert not any("田中" in doctor for doctor in doctor_list)
-    
-    @patch('services.csv_processor.ConfigManager')
-    def test_process_csv_data_multiple_exclusions(self, mock_config_manager):
+        result_df = process_csv_data(self.create_test_dataframe(), ["検査"], ["田中"])
+
+        # "検査結果A"（スペース・*除去後）と"田中医師"の行が除外される
+        assert len(result_df) == 3
+        assert not any("検査" in doc for doc in self.column_values(result_df, DOC_COL_IDX))
+        assert not any("田中" in doctor for doctor in self.column_values(result_df, DOCTOR_COL_IDX))
+
+    def test_process_csv_data_multiple_exclusions(self):
         """複数の除外条件でのテスト"""
-        # ConfigManagerのモック設定
-        mock_config = MagicMock()
-        mock_config.get_exclude_docs.return_value = ["検査", "診断"]
-        mock_config.get_exclude_doctors.return_value = ["田中", "佐藤"]
-        mock_config_manager.return_value = mock_config
-        
-        # テストデータ作成
-        df = self.create_test_dataframe()
-        
-        # 処理実行
-        result_df = process_csv_data(df)
-        
-        # 結果確認（複数の除外条件に該当する行が全て削除されていること）
-        assert len(result_df) == 1  # 「処方箋C」と「佐藤医師」の組み合わせも除外される
-        doc_col_idx = 3  # col_6_文書名（元G列）
-        doctor_col_idx = 5  # col_9_医師名（元J列）
-        doc_list = result_df[result_df.columns[doc_col_idx]].to_list()
-        doctor_list = result_df[result_df.columns[doctor_col_idx]].to_list()
-        
-        # 除外条件に該当しない行のみ残っていることを確認
-        assert "除外文書" in doc_list
-        assert "鈴木医師" in doctor_list
+        result_df = process_csv_data(self.create_test_dataframe(), ["検査", "診断"], ["田中", "佐藤"])
+
+        assert len(result_df) == 1
+        assert "除外文書" in self.column_values(result_df, DOC_COL_IDX)
+        assert "鈴木医師" in self.column_values(result_df, DOCTOR_COL_IDX)
+
+
+class TestDataframeToDocuments:
+    def test_converts_rows(self):
+        """日付は YYYY-MM-DD、患者IDは数値の取り込み用の行にする"""
+        df = pl.DataFrame({
+            "預り日": [datetime.date(2025, 1, 5)],
+            "患者ID": [12345],
+            "患者名": ["山田　太郎"],
+            "文書名": ["診断書"],
+            "診療科": ["内科"],
+            "医師名": ["田中"],
+        })
+
+        assert dataframe_to_documents(df) == [
+            NewDocument('2025-01-05', 12345, '山田　太郎', '診断書', '内科', '田中')
+        ]

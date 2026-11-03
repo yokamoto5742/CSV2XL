@@ -1,29 +1,26 @@
-import shutil
 import datetime
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from utils.config_manager import ConfigManager
 
 
-def backup_excel_file(excel_path: str) -> None:
-    """Excelファイルのバックアップを作成
+def backup_database(connection: sqlite3.Connection) -> Path:
+    """DB のバックアップをバックアップフォルダに作成し、作成したファイルのパスを返す
 
-    Args:
-        excel_path: バックアップ対象のExcelファイルパス
+    ファイルコピーではなく SQLite の backup API を使い、書き込み途中の状態を写さないようにする
     """
     config = ConfigManager()
     backup_dir = Path(config.get_backup_path())
+    backup_dir.mkdir(parents=True, exist_ok=True)
 
-    if not backup_dir.exists():
-        backup_dir.mkdir(parents=True)
-
-    # 現在の日時を取得してファイル名を生成
     timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M')
-    backup_filename = f"医療文書担当一覧_{timestamp}.xlsm"
-    backup_path = backup_dir / backup_filename
-
-    shutil.copy2(excel_path, backup_path)
+    backup_path = backup_dir / f"医療文書担当一覧_{timestamp}.db"
+    with closing(sqlite3.connect(backup_path)) as backup_connection:
+        connection.backup(backup_connection)
     print(f"バックアップを作成しました: {backup_path}")
+    return backup_path
 
 
 def cleanup_old_csv_files(processed_dir: Path) -> None:
@@ -54,7 +51,7 @@ def cleanup_old_backup_files() -> None:
         return
 
     current_time = datetime.datetime.now()
-    for file in backup_dir.glob("医療文書担当一覧_*.xlsm"):
+    for file in backup_dir.glob("医療文書担当一覧_*.db"):
         file_time = datetime.datetime.fromtimestamp(file.stat().st_mtime)
         if (current_time - file_time).days >= retention_days:
             try:

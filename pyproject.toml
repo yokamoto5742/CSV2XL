@@ -1,20 +1,18 @@
 [project]
 name = "csv2xl"
-version = "1.2.0"
+version = "2.0.0"
 requires-python = ">=3.13"
 
 dependencies = [
-    "openpyxl>=3.1.5",
     "polars>=1.17.1",
     "psutil>=6.1.0",
-    "pyautogui>=0.9.54",
     "pyqt6>=6.8.0",
-    "pywin32>=308",
 ]
 
 [dependency-groups]
 dev = [
     "coverage>=7.10.1",
+    "openpyxl>=3.1.5",
     "pyinstaller>=6.14.2",
     "pyright>=1.1.407",
     "pytest>=8.4.1",

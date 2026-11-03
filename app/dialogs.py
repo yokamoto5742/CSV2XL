@@ -8,14 +8,18 @@ from PyQt6.QtWidgets import (
     QMessageBox
 )
 
+from services.list_repository import EXCLUDE_DOCS, EXCLUDE_DOCTORS, STAFF, ListRepository
 from utils.config_manager import ConfigManager
 
-class ExcludeItemDialog(QDialog):
-    def __init__(self, title, config_section, parent=None):
+class ListItemDialog(QDialog):
+    """DB に保存するリスト(除外する文書名・医師名、担当者名)の編集"""
+
+    def __init__(self, title, category, repository: ListRepository, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
-        self.config_section = config_section
+        self.category = category
+        self.repository = repository
 
         layout = QVBoxLayout()
 
@@ -46,11 +50,10 @@ class ExcludeItemDialog(QDialog):
 
         self.setLayout(layout)
 
-        self.config = ConfigManager()
         self.load_items()
 
     def load_items(self):
-        self.item_list.addItems(self.config.get_list(self.config_section))
+        self.item_list.addItems(self.repository.get_items(self.category))
 
     def add_item(self):
         item_name = self.input_field.text().strip()
@@ -70,18 +73,23 @@ class ExcludeItemDialog(QDialog):
             if item is not None:
                 items.append(item.text())
 
-        self.config.set_list(self.config_section, items)
+        self.repository.set_items(self.category, items)
         super().accept()
 
 
-class ExcludeDocsDialog(ExcludeItemDialog):
-    def __init__(self, parent=None):
-        super().__init__("除外する文書名", "ExcludeDocs", parent)
+class ExcludeDocsDialog(ListItemDialog):
+    def __init__(self, repository: ListRepository, parent=None):
+        super().__init__("除外する文書名", EXCLUDE_DOCS, repository, parent)
 
 
-class ExcludeDoctorsDialog(ExcludeItemDialog):
-    def __init__(self, parent=None):
-        super().__init__("除外する医師名", "ExcludeDoctors", parent)
+class ExcludeDoctorsDialog(ListItemDialog):
+    def __init__(self, repository: ListRepository, parent=None):
+        super().__init__("除外する医師名", EXCLUDE_DOCTORS, repository, parent)
+
+
+class StaffNamesDialog(ListItemDialog):
+    def __init__(self, repository: ListRepository, parent=None):
+        super().__init__("担当者名", STAFF, repository, parent)
 
 
 class FolderPathDialog(QDialog):
@@ -102,10 +110,10 @@ class FolderPathDialog(QDialog):
             lambda: self.open_folder(self.downloads_path.text())
         )
 
-        self.excel_path = self.create_path_section(
-            layout, "Excelファイルパス:",
-            lambda: self.browse_folder('excel'),
-            lambda: self.open_folder(str(Path(self.excel_path.text()).parent))
+        self.database_path = self.create_path_section(
+            layout, "データベースファイル:",
+            lambda: self.browse_folder('database'),
+            lambda: self.open_folder(str(Path(self.database_path.text()).parent))
         )
 
         self.backup_path = self.create_path_section(
@@ -154,7 +162,7 @@ class FolderPathDialog(QDialog):
 
     def load_paths(self):
         self.downloads_path.setText(self.config.get_downloads_path())
-        self.excel_path.setText(self.config.get_excel_path())
+        self.database_path.setText(self.config.get_database_path())
         self.backup_path.setText(self.config.get_backup_path())
 
     def browse_folder(self, path_type):
@@ -170,18 +178,20 @@ class FolderPathDialog(QDialog):
             if folder:
                 path_field.setText(folder)
         else:
-            file, _ = QFileDialog.getOpenFileName(
+            # 新しい場所を指定することもあるため、存在しないファイル名も選べる保存ダイアログを使う
+            file, _ = QFileDialog.getSaveFileName(
                 self,
-                "Excelファイルの選択",
-                self.excel_path.text(),
-                "Excel Files (*.xlsx *.xlsm)"
+                "データベースファイルの選択",
+                self.database_path.text(),
+                "SQLite データベース (*.db)",
+                options=QFileDialog.Option.DontConfirmOverwrite
             )
             if file:
-                self.excel_path.setText(file)
+                self.database_path.setText(file)
 
     def accept(self):
         self.config.set_downloads_path(self.downloads_path.text())
-        self.config.set_excel_path(self.excel_path.text())
+        self.config.set_database_path(self.database_path.text())
         self.config.set_backup_path(self.backup_path.text())
         super().accept()
 

@@ -5,7 +5,10 @@ from unittest.mock import patch
 
 from PyQt6.QtWidgets import QApplication, QDialog, QListWidget
 
-from app.dialogs import ExcludeItemDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, AppearanceDialog
+from app.dialogs import (
+    AppearanceDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, ListItemDialog, StaffNamesDialog
+)
+from services.list_repository import EXCLUDE_DOCS, EXCLUDE_DOCTORS, STAFF, ListRepository
 from utils.config_manager import ConfigManager, CONFIG_PATH
 
 
@@ -57,19 +60,23 @@ def backup_config():
         config.write(f)
 
 
-class TestExcludeItemDialog:
-    def test_init(self, app, backup_config):
-        """ExcludeItemDialogの初期化テスト"""
-        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
+@pytest.fixture
+def list_repository(connection) -> ListRepository:
+    return ListRepository(connection)
+
+
+class TestListItemDialog:
+    def test_init(self, app, list_repository):
+        """ListItemDialogの初期化テスト"""
+        dialog = ListItemDialog("テストダイアログ", STAFF, list_repository)
         assert dialog.windowTitle() == "テストダイアログ"
-        assert dialog.config_section == "TestSection"
+        assert dialog.category == STAFF
         assert dialog.item_list is not None
 
-    def test_add_item(self, app, backup_config):
+    def test_add_item(self, app, list_repository):
         """項目追加機能のテスト"""
-        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
+        dialog = ListItemDialog("テストダイアログ", STAFF, list_repository)
 
-        # 項目を追加
         dialog.input_field.setText("テスト項目1")
         dialog.add_item()
 
@@ -81,71 +88,53 @@ class TestExcludeItemDialog:
         dialog.add_item()
         assert dialog.item_list.count() == 1
 
-    def test_delete_selected(self, app, backup_config):
+    def test_delete_selected(self, app, list_repository):
         """項目削除機能のテスト"""
-        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
-
-        # 項目を追加
+        dialog = ListItemDialog("テストダイアログ", STAFF, list_repository)
         dialog.input_field.setText("テスト項目1")
         dialog.add_item()
         dialog.input_field.setText("テスト項目2")
         dialog.add_item()
 
-        assert dialog.item_list.count() == 2
-
-        # 項目を選択して削除
         dialog.item_list.setCurrentRow(0)
         dialog.delete_selected()
 
         assert dialog.item_list.count() == 1
         assert get_item_text(dialog.item_list, 0) == "テスト項目2"
 
-    def test_load_items(self, app, backup_config):
-        """設定ファイルからの項目読み込みテスト"""
-        # 設定ファイルにテスト用セクションと項目を追加
-        ConfigManager().set_list('TestSection', ['アイテム1', 'アイテム2', 'アイテム3'])
+    def test_load_items(self, app, list_repository):
+        """DB からの項目読み込みテスト"""
+        list_repository.set_items(STAFF, ['アイテム1', 'アイテム2', 'アイテム3'])
 
-        # ダイアログを初期化して項目が読み込まれるか確認
-        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
+        dialog = ListItemDialog("テストダイアログ", STAFF, list_repository)
 
-        assert dialog.item_list.count() == 3
-        assert get_item_text(dialog.item_list, 0) == "アイテム1"
-        assert get_item_text(dialog.item_list, 1) == "アイテム2"
-        assert get_item_text(dialog.item_list, 2) == "アイテム3"
+        assert [get_item_text(dialog.item_list, i) for i in range(3)] == ['アイテム1', 'アイテム2', 'アイテム3']
 
-    def test_accept(self, app, backup_config):
-        """ダイアログ確定時の設定保存テスト"""
-        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
-
-        # 項目を追加
+    def test_accept(self, app, list_repository):
+        """ダイアログ確定時に DB へ保存するテスト"""
+        dialog = ListItemDialog("テストダイアログ", STAFF, list_repository)
         dialog.input_field.setText("新しい項目1")
         dialog.add_item()
         dialog.input_field.setText("新しい項目2")
         dialog.add_item()
 
-        # モック化したsuperクラスのacceptメソッドでテスト
         with patch.object(QDialog, 'accept') as mock_accept:
             dialog.accept()
             mock_accept.assert_called_once()
 
-        # 設定が保存されたことを確認
-        assert ConfigManager().get_list('TestSection') == ["新しい項目1", "新しい項目2"]
+        assert list_repository.get_items(STAFF) == ["新しい項目1", "新しい項目2"]
 
 
-class TestExcludeDocsDialog:
-    def test_init(self, app, backup_config):
-        """ExcludeDocsDialogの初期化テスト"""
-        dialog = ExcludeDocsDialog()
-        assert dialog.windowTitle() == "除外する文書名"
-        assert dialog.config_section == "ExcludeDocs"
-
-
-class TestExcludeDoctorsDialog:
-    def test_init(self, app, backup_config):
-        """ExcludeDoctorsDialogの初期化テスト"""
-        dialog = ExcludeDoctorsDialog()
-        assert dialog.windowTitle() == "除外する医師名"
-        assert dialog.config_section == "ExcludeDoctors"
+class TestListDialogSubclasses:
+    @pytest.mark.parametrize("dialog_class, title, category", [
+        (ExcludeDocsDialog, "除外する文書名", EXCLUDE_DOCS),
+        (ExcludeDoctorsDialog, "除外する医師名", EXCLUDE_DOCTORS),
+        (StaffNamesDialog, "担当者名", STAFF),
+    ])
+    def test_init(self, app, list_repository, dialog_class, title, category):
+        dialog = dialog_class(list_repository)
+        assert dialog.windowTitle() == title
+        assert dialog.category == category
 
 
 class TestFolderPathDialog:
@@ -154,7 +143,7 @@ class TestFolderPathDialog:
         dialog = FolderPathDialog()
         assert dialog.windowTitle() == "フォルダの場所"
         assert dialog.downloads_path is not None
-        assert dialog.excel_path is not None
+        assert dialog.database_path is not None
         assert dialog.backup_path is not None
 
     def test_load_paths(self, app, backup_config):
@@ -164,7 +153,7 @@ class TestFolderPathDialog:
         if 'Paths' not in config.config:
             config.config['Paths'] = {}
         config.config['Paths']['downloads_path'] = 'C:\\Test\\Downloads'
-        config.config['Paths']['excel_path'] = 'C:\\Test\\Excel\\test.xlsm'
+        config.config['Paths']['database_path'] = 'C:\\Test\\DB\\test.db'
         config.config['Paths']['backup_path'] = 'C:\\Test\\Backup'
         config.save_config()
 
@@ -172,7 +161,7 @@ class TestFolderPathDialog:
         dialog = FolderPathDialog()
 
         assert dialog.downloads_path.text() == 'C:\\Test\\Downloads'
-        assert dialog.excel_path.text() == 'C:\\Test\\Excel\\test.xlsm'
+        assert dialog.database_path.text() == 'C:\\Test\\DB\\test.db'
         assert dialog.backup_path.text() == 'C:\\Test\\Backup'
 
     @patch('app.dialogs.QFileDialog.getExistingDirectory')
@@ -197,16 +186,16 @@ class TestFolderPathDialog:
         mock_get_dir.assert_called_once()
         assert dialog.backup_path.text() == 'C:\\New\\Backup'
 
-    @patch('app.dialogs.QFileDialog.getOpenFileName')
-    def test_browse_folder_excel(self, mock_get_file, app, backup_config):
-        """Excelファイルブラウズ機能のテスト"""
-        mock_get_file.return_value = ('C:\\New\\Excel\\new.xlsm', 'Excel Files (*.xlsx *.xlsm)')
+    @patch('app.dialogs.QFileDialog.getSaveFileName')
+    def test_browse_folder_database(self, mock_get_file, app, backup_config):
+        """データベースファイルブラウズ機能のテスト"""
+        mock_get_file.return_value = ('C:\\New\\DB\\new.db', 'SQLite データベース (*.db)')
 
         dialog = FolderPathDialog()
-        dialog.browse_folder('excel')
+        dialog.browse_folder('database')
 
         mock_get_file.assert_called_once()
-        assert dialog.excel_path.text() == 'C:\\New\\Excel\\new.xlsm'
+        assert dialog.database_path.text() == 'C:\\New\\DB\\new.db'
 
     @patch('app.dialogs.os.path.exists')
     @patch('app.dialogs.os.startfile')
@@ -238,7 +227,7 @@ class TestFolderPathDialog:
 
         # パスを設定
         dialog.downloads_path.setText('C:\\New\\Downloads')
-        dialog.excel_path.setText('C:\\New\\Excel\\new.xlsm')
+        dialog.database_path.setText('C:\\New\\DB\\new.db')
         dialog.backup_path.setText('C:\\New\\Backup')
 
         # モック化したsuperクラスのacceptメソッドでテスト
@@ -249,7 +238,7 @@ class TestFolderPathDialog:
         # 設定が保存されたことを確認
         config = ConfigManager()
         assert config.get_downloads_path() == 'C:\\New\\Downloads'
-        assert config.get_excel_path() == 'C:\\New\\Excel\\new.xlsm'
+        assert config.get_database_path() == 'C:\\New\\DB\\new.db'
         assert config.get_backup_path() == 'C:\\New\\Backup'
 
 

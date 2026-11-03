@@ -9,6 +9,7 @@ def build_executable():
         "--windowed",
         "--icon=assets/CSV2XL.ico",
         "--add-data", "utils/config.ini;.",
+        "--add-data", "services/schema.sql;services",
         "main.py"
     ])
 

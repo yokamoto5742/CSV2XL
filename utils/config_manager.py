@@ -58,26 +58,17 @@ class ConfigManager:
         items = self.config.get(section, 'list', fallback='')
         return [item.strip() for item in items.split(',') if item.strip()]
 
-    def set_list(self, section: str, items: list[str]) -> None:
-        self._set(section, {'list': ','.join(items)})
-
-    def get_exclude_docs(self) -> list[str]:
-        return self.get_list('ExcludeDocs')
-
-    def get_exclude_doctors(self) -> list[str]:
-        return self.get_list('ExcludeDoctors')
-
     def get_downloads_path(self) -> str:
         return self.config.get('Paths', 'downloads_path', fallback=str(Path.home() / "Downloads"))
 
     def set_downloads_path(self, path: str) -> None:
         self._set('Paths', {'downloads_path': path})
 
-    def get_excel_path(self) -> str:
-        return self.config.get('Paths', 'excel_path', fallback=str(DEFAULT_BASE_DIR / "医療文書担当一覧.xlsm"))
+    def get_database_path(self) -> str:
+        return self.config.get('Paths', 'database_path', fallback=str(DEFAULT_BASE_DIR / "医療文書担当一覧.db"))
 
-    def set_excel_path(self, path: str) -> None:
-        self._set('Paths', {'excel_path': path})
+    def set_database_path(self, path: str) -> None:
+        self._set('Paths', {'database_path': path})
 
     def get_backup_path(self) -> str:
         return self.config.get('Paths', 'backup_path', fallback=str(DEFAULT_BASE_DIR / "backup"))
@@ -106,14 +97,6 @@ class ConfigManager:
 
     def set_window_size(self, width: int, height: int) -> None:
         self._set('Appearance', {'window_width': str(width), 'window_height': str(height)})
-
-    def get_share_button_position(self) -> tuple[int, int]:
-        x = self.config.getint('ButtonPosition', 'share_button_x', fallback=1450)
-        y = self.config.getint('ButtonPosition', 'share_button_y', fallback=180)
-        return x, y
-
-    def get_share_button_wait_time(self) -> int:
-        return self.config.getint('ButtonPosition', 'share_button_wait_time', fallback=3)
 
     def get_backup_retention_days(self) -> int:
         """バックアップファイルの保持日数を取得"""

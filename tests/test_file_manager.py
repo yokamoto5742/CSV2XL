@@ -1,79 +1,28 @@
+import sqlite3
+from contextlib import closing
+
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from services.file_manager import backup_excel_file, cleanup_old_csv_files, ensure_directories_exist
+from services.file_manager import backup_database, cleanup_old_csv_files, ensure_directories_exist
 
 
 class TestFileManager:
-    @patch('services.file_manager.shutil.copy2')
-    @patch('services.file_manager.Path')
     @patch('services.file_manager.ConfigManager')
-    def test_backup_excel_file(self, mock_config_manager, mock_path, mock_copy2):
-        """バックアップファイル作成機能のテスト"""
-        # ConfigManagerのモック設定
-        mock_config = MagicMock()
-        mock_config.get_backup_path.return_value = 'C:/Backup'
-        mock_config_manager.return_value = mock_config
+    def test_backup_database(self, mock_config_manager, connection: sqlite3.Connection, tmp_path: Path):
+        """バックアップフォルダを作成し、DB の内容をバックアップファイルに写す"""
+        backup_dir = tmp_path / 'backup'
+        mock_config_manager.return_value.get_backup_path.return_value = str(backup_dir)
+        with connection:
+            connection.execute("INSERT INTO list_items (category, name, sort_order) VALUES ('staff', '山本', 0)")
 
-        # Pathのモック設定
-        mock_backup_dir = MagicMock()
-        mock_backup_dir.exists.return_value = True
-        mock_path.return_value = mock_backup_dir
+        backup_path = backup_database(connection)
 
-        # ファイル名を取得するためのPathモック
-        mock_excel_path = MagicMock()
-        mock_excel_path.name = 'test.xlsm'
-        mock_path.side_effect = [mock_backup_dir, mock_excel_path]
-
-        # バックアップパスのモック設定
-        backup_path = MagicMock()
-        mock_backup_dir.__truediv__.return_value = backup_path
-
-        # 関数実行
-        backup_excel_file('C:/Excel/test.xlsm')
-
-        # 結果を確認
-        mock_config_manager.assert_called_once()
-        mock_config.get_backup_path.assert_called_once()
-
-        # バックアップディレクトリの存在確認
-        mock_backup_dir.exists.assert_called_once()
-
-        # バックアップ処理（コピー）が実行されたことを確認
-        mock_copy2.assert_called_once()
-        args = mock_copy2.call_args[0]
-        assert args[0] == 'C:/Excel/test.xlsm'  # コピー元
-        assert args[1] == backup_path  # コピー先
-
-    @patch('services.file_manager.shutil.copy2')
-    @patch('services.file_manager.Path')
-    @patch('services.file_manager.ConfigManager')
-    def test_backup_excel_file_create_dir(self, mock_config_manager, mock_path, mock_copy2):
-        """バックアップディレクトリが存在しない場合のテスト"""
-        # ConfigManagerのモック設定
-        mock_config = MagicMock()
-        mock_config.get_backup_path.return_value = 'C:/Backup'
-        mock_config_manager.return_value = mock_config
-
-        # Pathのモック設定（ディレクトリが存在しないケース）
-        mock_backup_dir = MagicMock()
-        mock_backup_dir.exists.return_value = False
-        mock_path.return_value = mock_backup_dir
-
-        # ファイル名を取得するためのPathモック
-        mock_excel_path = MagicMock()
-        mock_excel_path.name = 'test.xlsm'
-        mock_path.side_effect = [mock_backup_dir, mock_excel_path]
-
-        # 関数実行
-        backup_excel_file('C:/Excel/test.xlsm')
-
-        # ディレクトリが作成されたことを確認
-        mock_backup_dir.mkdir.assert_called_once_with(parents=True)
-
-        # バックアップ処理が実行されたことを確認
-        mock_copy2.assert_called_once()
+        assert backup_path.parent == backup_dir
+        assert backup_path.name.startswith('医療文書担当一覧_') and backup_path.suffix == '.db'
+        with closing(sqlite3.connect(backup_path)) as backup_connection:
+            assert backup_connection.execute("SELECT name FROM list_items").fetchone()[0] == '山本'
 
     @patch('services.file_manager.ConfigManager')
     @patch('services.file_manager.datetime.datetime')

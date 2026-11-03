@@ -1,141 +1,110 @@
-# CSV2XL - 医療文書管理アプリケーション
+# CSV2XL - 医療文書担当一覧アプリケーション
 
-医療文書管理システム「Papyrus」からのCSVデータを、PyQt6ベースのGUIで効率的にExcelファイルに自動転記するデスクトップアプリケーションです。
+医療文書管理システム「Papyrus」からの CSV データを SQLite データベースに取り込み、医療文書の担当一覧を表示・編集する PyQt6 製のデスクトップアプリケーションです。以前の「医療文書担当一覧.xlsm」の機能(患者ID検索・並び替え・担当者名などの入力)をアプリだけで行えます。
 
 ## 主な機能
 
-- 最新のCSVファイルを自動検出・処理
-- 複数エンコーディング対応（Shift-JIS、UTF-8、CP932）
-- CSV内の日付を自動変換
-- 除外する文書名・医師名をカスタマイズ可能
-- Excelへの転記時に重複を自動検出
-- 処理前に自動バックアップを作成
-- UIのフォント・ウィンドウサイズをカスタマイズ
-- 自動化機能の座標設定をサポート
+- 最新の CSV ファイルを自動検出して取り込み(既存の行と同じものは追加しない)
+- 複数エンコーディング対応(Shift-JIS、CP932、UTF-8)
+- 担当一覧の表示(既定は 預り日 → 診療科 → 患者ID の順。列見出しのクリックで並び替え)
+- 担当者名(ドロップダウン)・医師依頼日(日付チェックあり)・備考の入力
+- 患者ID検索(見つかった行を順に表示)
+- 複数の PC から同じデータベースを共有(5 秒ごとに他の端末の変更を反映)
+- 取り込みのたびにデータベースのバックアップを作成
+- 除外する文書名・医師名と担当者名のリストは、全端末で共有
 
 ## 前提条件
 
 - **OS**: Windows 11
 - **Python**: 3.13 以上
-- **メモリ**: 4GB 以上（推奨）
 
 ## インストール
 
-### 1. リポジトリをクローン
+[uv](https://docs.astral.sh/uv/) を使用します。仮想環境(`.venv`)も自動で作成されます。
+
 ```bash
 git clone <repository-url>
 cd CSV2XL
-```
-
-### 2. 依存パッケージをインストール
-[uv](https://docs.astral.sh/uv/) を使用します。仮想環境（`.venv`）も自動で作成されます。
-```bash
 uv sync
-```
-
-### 3. アプリケーションを起動
-```bash
 uv run python main.py
 ```
 
 ## 使い方
 
-### アプリケーション起動
-```bash
-uv run python main.py
-```
-
 ### 基本的なワークフロー
 
-1. PapyrusからダウンロードフォルダにCSVファイルをエクスポート
-2. **CSVファイル取り込み**ボタンをクリック
-3. 以下が自動で実行されます：
-   - 最新のCSVを検出・読み込み
-   - データを処理・変換
-   - Excelに転記
-   - バックアップを作成
-   - 処理済みCSVを指定フォルダに移動
-4. Excelファイルが自動で開きます
+1. Papyrus からダウンロードフォルダに CSV ファイルをエクスポート
+2. **CSVファイル取り込み** ボタンをクリック
+   - 最新の CSV を読み込み、除外リストに該当する行を除いてデータベースに追加
+   - 処理済み CSV を processed フォルダへ移動し、データベースのバックアップを作成
+3. 追加した件数が表示され、担当一覧が開きます
 
-### 設定項目
+### 担当一覧
 
-**フィルタリング**:
-- 除外する文書名（カンマ区切り）
-- 除外する医師名（カンマ区切り）
+- **患者ID検索**: 患者ID を入力して「検索」(または Enter)。「前へ」「次へ」で該当する行を移動し、「n/m件」で位置を表示します
+- **並び替え**: 列見出しをクリックすると、その列で昇順・降順を切り替えます
+- **入力**: 担当者名・医師依頼日・備考の列をダブルクリック(またはキー入力)で編集します。確定するとすぐに保存されます
+  - 医師依頼日は `2025/01/05` や `2025-1-5` の形式で入力します。正しくない日付は保存されません
+  - 他の端末が先に同じ行を更新していた場合は、警告を出して最新の内容を読み込みます
+- **再読み込み**: 最新の内容を読み込みます(5 秒ごとにも自動で確認します)
 
-**UI設定**:
-- フォントサイズ（既定値：11）
-- ウィンドウサイズ（既定値：350×330）
+### 設定
 
-**ファイル・フォルダパス**:
-- ダウンロードフォルダ（CSVファイルの検索元）
-- Excelファイルパス（データ転記先）
-- バックアップフォルダ
-- 処理済みCSVフォルダ
+| ボタン | 内容 | 保存先 |
+|---|---|---|
+| 除外する文書名 / 除外する医師名 | 取り込まない行の条件(部分一致) | データベース(全端末共通) |
+| 担当者名 | 担当者名のドロップダウンの選択肢 | データベース(全端末共通) |
+| フォントとウインドウサイズ | 画面の表示 | config.ini(端末ごと) |
+| フォルダの場所 | ダウンロード・データベースファイル・バックアップの場所 | config.ini(端末ごと) |
 
-**その他**:
-- 画面の座標表示：マウス座標をリアルタイム表示し、自動化機能の座標を取得
+## Excel からの移行(最初に1回だけ)
+
+医療文書担当一覧.xlsm の全行と、設定シートの担当者名、config.ini の除外リストをデータベースに移します。
+
+```bash
+uv run python -m scripts.migrate_from_xlsm "\\Jimtower\...\医療文書担当一覧.xlsm"
+```
+
+- 移行先は config.ini の `[Paths] database_path`(省略時は `C:\Shinseikai\CSV2XL\医療文書担当一覧.db`)です。2 番目の引数で別の場所を指定できます
+- データベースにすでに行がある場合は、二重登録を防ぐため中止します
+
+## データベースの場所
+
+既定は `C:\Shinseikai\CSV2XL\医療文書担当一覧.db` です。共有フォルダに移す場合は、ファイルをコピーしてから各 PC の「フォルダの場所」で「データベースファイル」を変更してください。
 
 ## プロジェクト構造
 
 ```
 CSV2XL/
-├── app/                       # UI レイヤー
-│   ├── __init__.py           # バージョン情報
-│   ├── main_window.py        # メインウィンドウ
-│   └── dialogs.py            # 設定ダイアログ
-├── services/                 # ビジネスロジック
-│   ├── csv_excel_transfer.py # CSVからExcelへの転送処理
-│   ├── csv_processor.py      # CSV読込・エンコーディング判定
-│   ├── excel_processor.py    # Excel書込・ソート・フォーマット
-│   ├── file_manager.py       # バックアップ・クリーンアップ
-│   └── coordinate_tracker.py # 座標トラッキング機能
-├── utils/                    # ユーティリティ
-│   ├── config_manager.py     # 設定ファイル管理
-│   └── config.ini            # 設定ファイル
-├── scripts/                  # 補助スクリプト
-│   └── project_structure.py  # プロジェクト構造の出力
-├── tests/                    # ユニットテスト
-├── main.py                   # エントリーポイント
-├── build.py                  # 実行ファイル生成スクリプト
-├── pyproject.toml            # プロジェクト設定・依存パッケージ
-└── uv.lock                   # 依存パッケージのロックファイル
+├── app/                         # UI レイヤー
+│   ├── main_window.py          # メインウィンドウ
+│   ├── document_window.py      # 担当一覧(検索・自動更新・担当者名ドロップダウン)
+│   ├── document_table_model.py # 担当一覧の表のモデル(並び替え・編集の保存)
+│   └── dialogs.py              # 設定ダイアログ
+├── services/                   # ビジネスロジック
+│   ├── schema.sql              # データベースのスキーマ
+│   ├── database.py             # データベース接続
+│   ├── document_repository.py  # 担当一覧の読み書き
+│   ├── list_repository.py      # 担当者名・除外リストの読み書き
+│   ├── csv_import.py           # CSV 取り込みの流れ
+│   ├── csv_processor.py        # CSV 読込・加工
+│   ├── file_manager.py         # バックアップ・クリーンアップ
+│   └── validators.py           # 日付・患者IDの入力チェック
+├── utils/
+│   ├── config_manager.py       # 設定ファイル管理
+│   └── config.ini              # 設定ファイル
+├── scripts/
+│   └── migrate_from_xlsm.py    # Excel からの移行
+├── docs/
+│   └── spec.md                 # 仕様書(C# 版への移植用)
+├── tests/
+├── main.py
+└── build.py
 ```
 
-## 主要機能の詳細
+## 設定ファイル(config.ini)
 
-### CSVデータ処理
-
-複数のエンコーディング対応により、様々な形式のCSVファイルを自動判定して読み込みます：
-
-```python
-from services.csv_processor import read_csv_with_encoding, process_csv_data, convert_date_format
-
-# エンコーディング自動判定（Shift-JIS → CP932 → UTF-8の順で試行）
-df = read_csv_with_encoding("path/to/file.csv")
-# 列名の一意化、スペース・特殊文字の除去
-df = process_csv_data(df)
-# 日付形式を自動変換
-df = convert_date_format(df)
-```
-
-### Excel操作とファイル管理
-
-```python
-from services.excel_processor import write_data_to_excel, open_and_sort_excel
-from services.file_manager import backup_excel_file, cleanup_old_csv_files
-
-# Excelに書込（重複自動検出・セル書式自動適用）
-success = write_data_to_excel("path/to/file.xlsx", df)
-
-# バックアップ作成と古いファイル削除
-backup_excel_file("path/to/file.xlsx")
-cleanup_old_csv_files("processed_folder_path")
-```
-
-## 設定ファイル（config.ini）
-
-exe で実行する場合は、exe と同じフォルダの `config.ini` を読み書きします（初回起動時に同梱版がコピーされます）。
+exe で実行する場合は、exe と同じフォルダの `config.ini` を読み書きします(初回起動時に同梱版がコピーされます)。
 
 ```ini
 [Appearance]
@@ -143,107 +112,55 @@ font_size = 11
 window_width = 350
 window_height = 330
 
-[ExcludeDocs]
-list = 訪問看護指示書,紹介状
-
-[ExcludeDoctors]
-list = 田中,山田,中村
-
 [Paths]
 downloads_path = C:\Users\...\Downloads
-excel_path = C:\path\to\file.xlsm
-backup_path = C:\path\to\backup
-processed_path = C:\path\to\processed
+database_path = C:\Shinseikai\CSV2XL\医療文書担当一覧.db
+backup_path = C:\Shinseikai\CSV2XL\backup
+processed_path = C:\Shinseikai\CSV2XL\processed
 
 [Backup]
 retention_days = 14
-
-[ButtonPosition]
-share_button_x = 1450
-share_button_y = 160
-share_button_wait_time = 1
 ```
 
-- **Appearance**: UI外観設定（フォントサイズ、ウィンドウサイズ）
-- **ExcludeDocs/ExcludeDoctors**: フィルタリング対象
-- **Paths**: ファイル・フォルダパス
-- **Backup**: バックアップ・処理済みCSVの保持期間（日数）
-- **ButtonPosition**: 自動化機能の座標設定
+- **Paths**: ファイル・フォルダのパス
+- **Backup**: バックアップ・処理済み CSV の保持期間(日数)
+- **ExcludeDocs / ExcludeDoctors**: 移行スクリプトが読むだけです。移行後はデータベースのリストを使います
 
 ## 開発情報
 
-### テスト実行
-
 ```bash
-uv run pytest tests/ -v --tb=short                # 全テストを実行
-uv run pytest tests/test_csv_processor.py -v      # 特定テストを実行
-uv run pytest tests/ --cov --cov-report=term-missing  # カバレッジ付きで実行
-uv run pyright                                    # 型チェック
+uv run pytest tests/ -v --tb=short   # 全テストを実行
+uv run pyright                       # 型チェック
+python build.py                      # dist/CSV2XL.exe を作成
 ```
 
-### 実行ファイル生成
+- バージョンは `app/__init__.py` の `__version__` と `pyproject.toml` の `version` を手動でそろえます
+- 仕様は [docs/spec.md](docs/spec.md) にまとめています。C# 版への移植時はこれを基準にします
 
-```bash
-python build.py
-```
-
-PyInstallerで実行ファイルを生成します。出力先は `dist/` フォルダです。バージョンは自動更新されません。
-
-### バージョン管理
-
-`app/__init__.py` の `__version__` と `pyproject.toml` の `version` を手動で同じ値にそろえます：
-```python
-__version__ = "1.1.5"
-```
-
-### 主要な依存パッケージ
-
-詳細は `pyproject.toml` を参照：
-
-- **PyQt6** (6.8.0): GUIフレームワーク
-- **openpyxl** (3.1.5): Excel操作
-- **polars** (1.17.1): CSV/データ処理
-- **PyAutoGUI** (0.9.54): UI自動化
-- **pyinstaller** (6.11.1): 実行ファイル生成
-
-## CSVファイル名規則
-
-アプリケーションは以下のパターンのCSVファイルのみを処理します：
+## CSV ファイル名規則
 
 ```
 XXXX_YYYYMMDDhhmmss.csv
 例: 0001_20250101120000.csv
 ```
 
-最新のファイルが自動で検出されます。
-
 ## トラブルシューティング
 
-**CSVファイルが見つからない**
-- ダウンロードフォルダパスが `config.ini` で正しく設定されているか確認
-- ファイル名が `XXXX_YYYYMMDDhhmmss.csv` 形式と一致するか確認
+**CSV ファイルが見つからない**
+- 「フォルダの場所」のダウンロードフォルダが正しいか確認
+- ファイル名が `XXXX_YYYYMMDDhhmmss.csv` 形式か確認
 
-**エンコーディングエラー**
-- CSVを Shift-JIS または UTF-8 で再度エクスポート
-- 対応エンコーディング: Shift-JIS、CP932、UTF-8（この順で試行）
+**データベースを開けない / 保存に失敗する**
+- 「フォルダの場所」のデータベースファイルのパスと、共有フォルダへのアクセス権を確認
+- 「database is locked」と表示された場合は、他の端末の処理が終わってから再度操作
 
-**Excelが開けない / データが転記されない**
-- ファイルパスが正しいか、他のアプリで開かれていないか確認
-- ファイルが読み取り可能な状態か確認
-- Excelファイルのフォーマットが .xlsm であることを確認
-
-**座標設定が機能しない**
-- UI設定メニューの「画面の座標表示」ツールで正確な座標を取得
-- `config.ini` の `[ButtonPosition]` セクションを更新
-
-**パフォーマンス低下**
-- バックアップフォルダと処理済みCSVフォルダをクリーンアップ
-- 保持期間は `config.ini` の `backup_retention_days` で設定可能（デフォルト：14日）
+**データベースが壊れた**
+- バックアップフォルダの `医療文書担当一覧_YYYYMMDDhhmm.db` をデータベースファイルの場所にコピーして戻す
 
 ## ライセンス
 
-このプロジェクトのライセンス情報については、 [LICENSE](docs/LICENSE) を参照してください。
+[LICENSE](docs/LICENSE) を参照してください。
 
 ## 更新履歴
 
-更新履歴は [CHANGELOG.md](docs/CHANGELOG.md) を参照してください。
+[CHANGELOG.md](docs/CHANGELOG.md) を参照してください。
