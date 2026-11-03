@@ -135,6 +135,8 @@ cleanup_old_csv_files("processed_folder_path")
 
 ## 設定ファイル（config.ini）
 
+exe で実行する場合は、exe と同じフォルダの `config.ini` を読み書きします（初回起動時に同梱版がコピーされます）。
+
 ```ini
 [Appearance]
 font_size = 11

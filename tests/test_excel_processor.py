@@ -190,25 +190,41 @@ class TestExcelProcessor:
         mock_workbook.save.assert_called_once_with("test.xlsm")
         mock_workbook.close.assert_called_once()
 
-    @patch('services.excel_processor.Path')
-    @patch('services.excel_processor.QMessageBox.critical')
-    def test_write_data_to_excel_file_not_found(self, mock_critical, mock_path, app):
-        """write_data_to_excel関数のファイル未発見ケースのテスト"""
-        # モックの設定
-        mock_path_instance = MagicMock()
-        mock_path_instance.exists.return_value = False
-        mock_path.return_value = mock_path_instance
+    def test_apply_cell_formats_keeps_vertical_center(self):
+        """全列で垂直中央配置が維持されることのテスト"""
+        worksheet = MagicMock()
+        cells = {}
 
-        # 関数実行
+        def mock_cell(row, column):
+            return cells.setdefault((row, column), MagicMock())
+
+        worksheet.cell.side_effect = mock_cell
+
+        with patch('services.excel_processor.get_last_row', return_value=2):
+            apply_cell_formats(worksheet, 2)
+
+        for col in range(1, 7):
+            assert cells[(2, col)].alignment.vertical == 'center'
+        assert cells[(2, 1)].alignment.horizontal == 'center'
+        assert cells[(2, 3)].alignment.horizontal == 'left'
+
+    def test_write_data_to_excel_file_not_found(self, tmp_path):
+        """Excelファイルが存在しない場合は例外になることのテスト"""
         import polars as pl
         df = pl.DataFrame({"test": [1, 2, 3]})
-        result = write_data_to_excel("nonexistent.xlsm", df)
 
-        # 結果を確認
-        assert result is False
-        mock_path.assert_called_once_with("nonexistent.xlsm")
-        mock_path_instance.exists.assert_called_once()
-        assert not mock_critical.called  # エラーメッセージは表示されない（ログだけ）
+        with pytest.raises(FileNotFoundError, match="Excelファイルが見つかりません"):
+            write_data_to_excel(str(tmp_path / "nonexistent.xlsm"), df)
+
+    def test_write_data_to_excel_not_xlsm(self, tmp_path):
+        """拡張子が.xlsmでない場合は例外になることのテスト"""
+        import polars as pl
+        excel_file = tmp_path / "test.xlsx"
+        excel_file.touch()
+        df = pl.DataFrame({"test": [1, 2, 3]})
+
+        with pytest.raises(ValueError, match=".xlsm"):
+            write_data_to_excel(str(excel_file), df)
 
     @patch('services.excel_processor.Path')
     @patch('services.excel_processor.load_workbook')
@@ -291,6 +307,21 @@ class TestExcelProcessor:
 
         # ウィンドウを最小化
         mock_hotkey.assert_called_once_with('win', 'down')
+
+    @patch('services.excel_processor.win32com.client.Dispatch')
+    @patch('services.excel_processor.bring_excel_to_front')
+    @patch('services.excel_processor.Path')
+    @patch('services.excel_processor.QMessageBox.critical')
+    @patch('services.excel_processor.pyautogui.hotkey')
+    def test_open_and_sort_excel_error_does_not_minimize(self, mock_hotkey, mock_critical,
+                                                         mock_path, mock_bring_front, mock_dispatch):
+        """エラー時は別ウィンドウを最小化しないことのテスト"""
+        mock_path.return_value.exists.return_value = True
+        mock_dispatch.return_value.Workbooks.Open.side_effect = Exception("開けません")
+
+        open_and_sort_excel("test.xlsm")
+
+        mock_hotkey.assert_not_called()
 
     def test_sort_excel_data(self):
         """sort_excel_data関数のテスト"""

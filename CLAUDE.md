@@ -24,5 +24,5 @@ PyQt6 製の Windows 専用 GUI。ダウンロードフォルダの最新 CSV(`X
 
 - `services/excel_processor.py` の `open_and_sort_excel` は win32com で実際の Excel を操作し、pyautogui で `[ButtonPosition]` の座標をクリックする。テストでは win32com・pyautogui を必ずモックする。
 - CSV の読み込みは Shift-JIS → CP932 → UTF-8 の順にエンコーディングを試す。
-- `utils/config.ini` は exe に同梱され、exe 実行時は `sys._MEIPASS` 内のコピーを読む。設定の既定値を変えたら再ビルドが必要。
+- `utils/config.ini` は exe に同梱される。exe 実行時は exe と同じフォルダの `config.ini` を読み書きし、無ければ同梱版(`sys._MEIPASS` 内)をコピーする。設定の既定値を変えたら再ビルドが必要。
 - `utils/config.ini` のパスはこの PC 固有の値。勝手に書き換えない。

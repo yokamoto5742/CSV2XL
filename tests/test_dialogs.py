@@ -310,3 +310,18 @@ class TestAppearanceDialog:
         window_size = config.get_window_size()
         assert window_size[0] == 450
         assert window_size[1] == 350
+
+    @pytest.mark.parametrize("width", ["", "5"])
+    @patch('app.dialogs.QMessageBox.warning')
+    def test_accept_invalid_input(self, mock_warning, width, app, backup_config):
+        """空欄や範囲外の値では保存せずに警告することのテスト"""
+        dialog = AppearanceDialog()
+        original_size = ConfigManager().get_window_size()
+        dialog.window_width_input.setText(width)
+
+        with patch.object(QDialog, 'accept') as mock_accept:
+            dialog.accept()
+            mock_accept.assert_not_called()
+
+        mock_warning.assert_called_once()
+        assert ConfigManager().get_window_size() == original_size

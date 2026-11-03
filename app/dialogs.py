@@ -236,6 +236,11 @@ class AppearanceDialog(QDialog):
         self.window_height_input.setText(str(window_size[1]))
 
     def accept(self):
+        inputs = [self.font_size_input, self.window_width_input, self.window_height_input]
+        if not all(field.hasAcceptableInput() for field in inputs):
+            QMessageBox.warning(self, "警告", "入力値が範囲外です。")
+            return
+
         self.config.set_font_size(int(self.font_size_input.text()))
         self.config.set_window_size(
             int(self.window_width_input.text()),

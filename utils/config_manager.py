@@ -1,16 +1,19 @@
 import configparser
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import List
 
 def get_config_path() -> Path:
-    # 実行ファイルのディレクトリを取得
     if getattr(sys, 'frozen', False):
-        base_path = Path(sys._MEIPASS)  # type: ignore[attr-defined]
-    else:
-        base_path = Path(os.path.dirname(os.path.abspath(__file__)))
-    return base_path / 'config.ini'
+        # exe 実行時は exe と同じフォルダの config.ini を使う(無ければ同梱版をコピーする)
+        config_path = Path(sys.executable).parent / 'config.ini'
+        if not config_path.exists():
+            bundled_path = Path(sys._MEIPASS) / 'config.ini'  # type: ignore[attr-defined]
+            shutil.copy2(bundled_path, config_path)
+        return config_path
+    return Path(os.path.dirname(os.path.abspath(__file__))) / 'config.ini'
 
 CONFIG_PATH = get_config_path()
 

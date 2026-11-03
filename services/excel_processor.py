@@ -46,13 +46,10 @@ def apply_cell_formats(worksheet: Worksheet, start_row: int) -> None:
         for col in range(1, 7):
             cell = worksheet.cell(row=row, column=col)
 
-            cell.alignment = Alignment(vertical='center')
-
-            if col in [1, 2, 5, 6]:  # A,B列とE,F列
-                cell.alignment = Alignment(horizontal='center')
-
-            elif col in [3, 4]:  # C列とD列
-                cell.alignment = Alignment(horizontal='left', shrink_to_fit=True)
+            if col in [3, 4]:  # C列とD列
+                cell.alignment = Alignment(vertical='center', horizontal='left', shrink_to_fit=True)
+            else:
+                cell.alignment = Alignment(vertical='center', horizontal='center')
 
 
 def sort_excel_data(worksheet: Any) -> int:
@@ -116,9 +113,10 @@ def write_data_to_excel(excel_path: str, df: pl.DataFrame) -> bool:
     Returns:
         成功時はTrue、失敗時はFalse
     """
-    if not Path(excel_path).exists() or not excel_path.endswith('.xlsm'):
-        print(f"Excelファイルが見つかりません: {excel_path}")
-        return False
+    if not Path(excel_path).exists():
+        raise FileNotFoundError(f"Excelファイルが見つかりません: {excel_path}")
+    if not excel_path.endswith('.xlsm'):
+        raise ValueError(f"Excelファイルは .xlsm 形式を指定してください: {excel_path}")
 
     try:
         wb = load_workbook(filename=excel_path, keep_vba=True)
@@ -335,10 +333,9 @@ def open_and_sort_excel(excel_path: str) -> None:
         share_x, share_y = config.get_share_button_position()
         pyautogui.click(share_x, share_y)
 
+        pyautogui.hotkey('win', 'down')  # ウィンドウを最小化
+
     except Exception as e:
         error_msg = f"Excelファイルの処理中にエラーが発生しました: {str(e)}"
         print(error_msg)
         QMessageBox.critical(None, "エラー", error_msg)
-    finally:
-        # Excelは開いたままにするがエラー処理は行う
-        pyautogui.hotkey('win', 'down')  # ウィンドウを最小化
