@@ -10,3 +10,5 @@ logs/
 *.iml
 
 error_log.txt
+
+__pycache__/

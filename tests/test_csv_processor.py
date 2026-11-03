@@ -4,11 +4,10 @@ from unittest.mock import patch, MagicMock
 from pathlib import Path
 
 import polars as pl
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication
 
 from services.csv_excel_transfer import transfer_csv_to_excel
 from services.csv_processor import process_csv_data
-from utils.config_manager import ConfigManager
 
 
 @pytest.fixture

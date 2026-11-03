@@ -1,13 +1,9 @@
-import os
 import sys
 import pytest
 import configparser
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
-from PyQt6.QtTest import QTest
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QPushButton
 
 from app.main_window import MainWindow
 from utils.config_manager import ConfigManager, CONFIG_PATH
@@ -186,14 +182,10 @@ class TestMainWindow:
         window = MainWindow()
 
         # 閉じるボタンを探して押下
-        central_widget = window.centralWidget()
-        layout = central_widget.layout()
-
         close_button = None
-        for i in range(layout.count()):
-            widget = layout.itemAt(i).widget()
-            if widget is not None and hasattr(widget, 'text') and widget.text() == "閉じる":
-                close_button = widget
+        for button in window.findChildren(QPushButton):
+            if button.text() == "閉じる":
+                close_button = button
                 break
 
         assert close_button is not None

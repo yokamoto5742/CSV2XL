@@ -1,16 +1,18 @@
-import os
 import sys
 import pytest
 import configparser
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from PyQt6.QtWidgets import QApplication, QDialogButtonBox, QMessageBox, QDialog
-from PyQt6.QtTest import QTest
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QDialog, QListWidget
 
 from app.dialogs import ExcludeItemDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, AppearanceDialog
 from utils.config_manager import ConfigManager, CONFIG_PATH
+
+
+def get_item_text(list_widget: QListWidget, row: int) -> str:
+    item = list_widget.item(row)
+    assert item is not None
+    return item.text()
 
 
 def restore_config(config, original_config):
@@ -72,7 +74,7 @@ class TestExcludeItemDialog:
         dialog.add_item()
 
         assert dialog.item_list.count() == 1
-        assert dialog.item_list.item(0).text() == "テスト項目1"
+        assert get_item_text(dialog.item_list, 0) == "テスト項目1"
 
         # 空白の項目は追加されないことを確認
         dialog.input_field.setText("  ")
@@ -96,7 +98,7 @@ class TestExcludeItemDialog:
         dialog.delete_selected()
 
         assert dialog.item_list.count() == 1
-        assert dialog.item_list.item(0).text() == "テスト項目2"
+        assert get_item_text(dialog.item_list, 0) == "テスト項目2"
 
     def test_load_items(self, app, backup_config):
         """設定ファイルからの項目読み込みテスト"""
@@ -111,9 +113,9 @@ class TestExcludeItemDialog:
         dialog = ExcludeItemDialog("テストダイアログ", "テスト項目", "TestSection")
 
         assert dialog.item_list.count() == 3
-        assert dialog.item_list.item(0).text() == "アイテム1"
-        assert dialog.item_list.item(1).text() == "アイテム2"
-        assert dialog.item_list.item(2).text() == "アイテム3"
+        assert get_item_text(dialog.item_list, 0) == "アイテム1"
+        assert get_item_text(dialog.item_list, 1) == "アイテム2"
+        assert get_item_text(dialog.item_list, 2) == "アイテム3"
 
     def test_accept(self, app, backup_config):
         """ダイアログ確定時の設定保存テスト"""

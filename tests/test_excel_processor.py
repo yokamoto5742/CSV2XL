@@ -1,15 +1,12 @@
 import sys
 import pytest
 import datetime
-from pathlib import Path
-from unittest.mock import patch, MagicMock, Mock, call
+from unittest.mock import patch, MagicMock
 
-import openpyxl
-from openpyxl.styles import Alignment
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication
 
 from services.excel_processor import (
-    get_last_row, apply_cell_formats, sort_excel_data,
+    get_last_row, apply_cell_formats,
     bring_excel_to_front, write_data_to_excel, open_and_sort_excel
 )
 

@@ -3,10 +3,9 @@ import pytest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication
 
 from services.csv_excel_transfer import transfer_csv_to_excel
-from utils.config_manager import ConfigManager
 
 
 @pytest.fixture

@@ -3,8 +3,6 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QKeySequence
 
 from services.coordinate_tracker import CoordinateTracker
 
@@ -76,20 +74,9 @@ class TestCoordinateTracker:
         mock_clipboard_instance = MagicMock()
         mock_clipboard.return_value = mock_clipboard_instance
 
-        tracker = CoordinateTracker()
+        CoordinateTracker()
 
-        # Spaceキーのショートカットを探す
-        shortcut = None
-        for child in tracker.children():
-            if isinstance(child, QKeySequence):
-                shortcut = child
-                break
-
-        # ショートカットが存在することを確認
-        # 注: 実際のショートカットのテストはQtのイベントシステムに依存するため難しい
-        # ここではショートカットが正しく設定されていることを間接的に確認
-
-        # 代わりにコピー関数の動作を直接テスト
+        # ショートカットのテストはQtのイベントシステムに依存するため、コピー関数の動作を直接テスト
         CoordinateTracker.copy_coordinates()
         mock_clipboard_instance.setText.assert_called_once_with("700, 800")
 
@@ -99,7 +86,7 @@ class TestCoordinateTracker:
         mock_timer_instance = MagicMock()
         mock_timer.return_value = mock_timer_instance
 
-        tracker = CoordinateTracker()
+        CoordinateTracker()
 
         # タイマーがsetupされることを確認
         mock_timer_instance.timeout.connect.assert_called_once()

@@ -191,7 +191,7 @@ PyInstallerで実行ファイルを生成します。出力先は `dist/` フォ
 
 `app/__init__.py` の `__version__` と `pyproject.toml` の `version` を手動で同じ値にそろえます：
 ```python
-__version__ = "1.1.4"
+__version__ = "1.1.5"
 ```
 
 ### 主要な依存パッケージ
