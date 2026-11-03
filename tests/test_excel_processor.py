@@ -1,9 +1,12 @@
 import pytest
 import datetime
+from typing import cast
 from unittest.mock import patch, MagicMock
 
+from openpyxl.worksheet.worksheet import Worksheet
+
 from services.excel_processor import (
-    get_last_row, apply_cell_formats,
+    get_last_row, apply_cell_formats, make_row_key, filter_new_rows, write_rows,
     bring_excel_to_front, write_data_to_excel, open_and_sort_excel
 )
 
@@ -129,24 +132,12 @@ class TestExcelProcessor:
         mock_workbook, mock_worksheet = MagicMock(), MagicMock()
         mock_load_workbook.return_value = mock_workbook
         mock_workbook.active = mock_worksheet
-        mock_get_last_row.return_value = 3  # 既存データが3行
+        mock_get_last_row.return_value = 2  # ヘッダー + 既存データ1行
 
-        # 既存データのモック
-        cell_values = {
-            (2, 1): datetime.datetime(2023, 1, 1),  # A2: 日付
-            (2, 2): "12345",  # B2: 患者ID
-            (2, 3): "診断書",  # C2: 文書名
-            (2, 4): "内科",  # D2: 診療科
-            (2, 5): "医師名",  # E2: 医師名
-            (2, 6): "備考"  # F2: 備考
-        }
-
-        def mock_cell(row, column):
-            cell = MagicMock()
-            cell.value = cell_values.get((row, column), None)
-            return cell
-
-        mock_worksheet.cell.side_effect = mock_cell
+        # 既存データ(A2～F2)のモック。患者IDはExcelでは数値になっている
+        mock_worksheet.iter_rows.return_value = [
+            (datetime.datetime(2023, 1, 1), 12345, "診断書", "内科", "医師名", "備考"),
+        ]
 
         # テスト用のCSVデータフレーム
         # 2行のデータ、1行目は既存と重複（スキップされる）、2行目は新規
@@ -169,9 +160,11 @@ class TestExcelProcessor:
         mock_load_workbook.assert_called_once_with(filename="test.xlsm", keep_vba=True)
         mock_get_last_row.assert_called_once_with(mock_worksheet)
 
-        # 新規データのみが書き込まれることを確認（2行目のみ）
-        assert mock_worksheet.cell.call_count >= 6  # 少なくとも新規データの列数分
-        mock_worksheet.cell.assert_any_call(row=4, column=1)  # 新規データ行
+        # 新規データ(CSVの2行目)だけが3行目に書き込まれることを確認
+        mock_worksheet.iter_rows.assert_called_once_with(min_row=2, max_row=2, max_col=6, values_only=True)
+        assert mock_worksheet.cell.call_count == 6
+        mock_worksheet.cell.assert_any_call(row=3, column=1)
+        mock_apply_formats.assert_called_once_with(mock_worksheet, 3)
 
         # 保存が呼ばれることを確認
         mock_workbook.save.assert_called_once_with("test.xlsm")
@@ -194,6 +187,35 @@ class TestExcelProcessor:
             assert cells[(2, col)].alignment.vertical == 'center'
         assert cells[(2, 1)].alignment.horizontal == 'center'
         assert cells[(2, 3)].alignment.horizontal == 'left'
+
+    def test_make_row_key_matches_excel_and_csv(self):
+        """Excel側(datetime・数値)とCSV側(文字列)で同じキーになることのテスト"""
+        excel_row = (datetime.datetime(2023, 1, 1), 12345, "診断書", "内科", None, "備考", "G列は無視")
+        csv_row = ("2023-01-01", "12345", "診断書", "内科", None, "備考")
+
+        assert make_row_key(excel_row) == make_row_key(csv_row)
+        assert make_row_key(csv_row) == ("2023-01-01", "12345", "診断書", "内科", "", "備考")
+
+    def test_filter_new_rows(self):
+        """既存キーに無い行だけが残ることのテスト"""
+        rows = [("2023-01-01", "1", "a", "b", "c", "d"), ("2023-01-02", "2", "a", "b", "c", "d")]
+        existing_keys = {("2023-01-01", "1", "a", "b", "c", "d")}
+
+        assert filter_new_rows(rows, existing_keys) == [rows[1]]
+
+    def test_write_rows_converts_types(self):
+        """日付列は日付型、患者ID列は数値、None は空文字で書き込まれることのテスト"""
+        from openpyxl import Workbook
+        ws = cast(Worksheet, Workbook().active)
+
+        write_rows(ws, 2, [("2023-01-01", "1,234", "診断書", None), ("不正な日付", "ID-X", "x", "y")])
+
+        assert ws.cell(row=2, column=1).value == datetime.datetime(2023, 1, 1)
+        assert ws.cell(row=2, column=1).number_format == 'yyyy/mm/dd'
+        assert ws.cell(row=2, column=2).value == 1234
+        assert ws.cell(row=2, column=4).value == ""
+        assert ws.cell(row=3, column=1).value == "不正な日付"
+        assert ws.cell(row=3, column=2).value == "ID-X"
 
     def test_write_data_to_excel_file_not_found(self, tmp_path):
         """Excelファイルが存在しない場合は例外になることのテスト"""

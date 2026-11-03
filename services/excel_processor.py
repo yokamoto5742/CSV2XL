@@ -1,7 +1,7 @@
 import datetime
 import time
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Sequence, cast
 
 import polars as pl
 import pyautogui
@@ -95,6 +95,52 @@ def bring_excel_to_front() -> bool:
     return False
 
 
+def make_row_key(row: Sequence[Any]) -> tuple[str, ...]:
+    """重複チェック用のキー(A～F列の値を文字列にしたもの)を作成
+
+    日付は Excel 側(datetime)と CSV 側(文字列)で型が違うため YYYY-MM-DD にそろえる
+    """
+    date_value = row[0]
+    if isinstance(date_value, datetime.date):
+        date_str = date_value.strftime('%Y-%m-%d')
+    else:
+        date_str = str(date_value or '')
+    return (date_str, *(str(value or '') for value in row[1:6]))
+
+
+def read_existing_keys(ws: Worksheet, last_row: int) -> set[tuple[str, ...]]:
+    """Excelの既存データ(2行目以降)の重複チェック用キーを取得"""
+    rows = ws.iter_rows(min_row=2, max_row=last_row, max_col=6, values_only=True)
+    return {make_row_key(row) for row in rows}
+
+
+def filter_new_rows(rows: list[tuple[Any, ...]], existing_keys: set[tuple[str, ...]]) -> list[tuple[Any, ...]]:
+    """既存データに無い行だけを返す"""
+    return [row for row in rows if make_row_key(row) not in existing_keys]
+
+
+def write_rows(ws: Worksheet, start_row: int, rows: list[tuple[Any, ...]]) -> None:
+    """行データをセルに書き込み、日付列は日付型、患者ID列は数値に変換する"""
+    for i, row in enumerate(rows):
+        for j, value in enumerate(row):
+            cell = cast(Any, ws.cell(row=start_row + i, column=j + 1))
+
+            if j == 0:  # 日付列を日付型に変換
+                try:
+                    cell.value = datetime.datetime.strptime(value, '%Y-%m-%d')
+                    cell.number_format = 'yyyy/mm/dd'
+                except ValueError:
+                    cell.value = value
+            elif j == 1:  # 患者ID列
+                try:
+                    cell.value = int(value.replace(',', ''))
+                    cell.number_format = '0'
+                except ValueError:
+                    cell.value = value
+            else:
+                cell.value = value if value is not None else ""
+
+
 def write_data_to_excel(excel_path: str, df: pl.DataFrame) -> None:
     """DataFrameのデータをExcelファイルに重複排除して書き込み
 
@@ -117,92 +163,13 @@ def write_data_to_excel(excel_path: str, df: pl.DataFrame) -> None:
         ) from e
 
     ws = cast(Worksheet, wb.active)
-
     last_row = get_last_row(ws)
 
-    # 既存データのセットを構築して重複チェック用のキーを作成（A～F列の値で識別）
-    existing_data = set()
-    for row in range(2, last_row + 1):
-        # 日付をYYYYMMDD形式の文字列として取得
-        cell1 = ws.cell(row=row, column=1)
-        date_value = cast(Any, cell1).value if cell1 else None
-        if isinstance(date_value, datetime.datetime):
-            date_str = date_value.strftime('%Y%m%d')
-        else:
-            date_str = str(date_value or '')
+    # DataFrameの値はすべて文字列にする(日付列は YYYY-MM-DD になる)
+    csv_rows = df.select(pl.col('*').cast(pl.String)).rows()
+    new_rows = filter_new_rows(csv_rows, read_existing_keys(ws, last_row))
 
-        # A列からF列までの値を取得（日付は数値形式で保持）
-        cell2 = ws.cell(row=row, column=2)
-        cell3 = ws.cell(row=row, column=3)
-        cell4 = ws.cell(row=row, column=4)
-        cell5 = ws.cell(row=row, column=5)
-        cell6 = ws.cell(row=row, column=6)
-        row_data = (
-            date_str,  # 日付を8桁の数値文字列として保持
-            str(cast(Any, cell2).value or '') if cell2 else '',
-            str(cast(Any, cell3).value or '') if cell3 else '',
-            str(cast(Any, cell4).value or '') if cell4 else '',
-            str(cast(Any, cell5).value or '') if cell5 else '',
-            str(cast(Any, cell6).value or '') if cell6 else ''
-        )
-        existing_data.add(row_data)
-
-    # DataFrameのすべての値を文字列に変換
-    temp_df = df.select([
-        pl.col('*').cast(pl.String)
-    ])
-    data_to_write = temp_df.to_numpy().tolist()
-
-    # 既存データセットに存在しないデータのみを抽出
-    unique_data = []
-    for row in data_to_write:
-        # 日付形式をYYYYMMDD形式に統一して比較
-        csv_date = row[0]
-        if isinstance(csv_date, str):
-            try:
-                # YYYY-MM-DD形式をYYYYMMDD形式に変換
-                date_obj = datetime.datetime.strptime(csv_date, '%Y-%m-%d')
-                date_str = date_obj.strftime('%Y%m%d')
-            except ValueError:
-                date_str = csv_date
-        else:
-            date_str = str(csv_date)
-
-        # 比較用のタプルを作成
-        row_data = (
-            date_str,
-            str(row[1] or ''),
-            str(row[2] or ''),
-            str(row[3] or ''),
-            str(row[4] or ''),
-            str(row[5] or '')
-        )
-
-        if row_data not in existing_data:
-            unique_data.append(row)
-
-    # 新規データを行ごとにセルに書き込み、必要に応じて型変換を実施
-    for i, row in enumerate(unique_data):
-        for j, value in enumerate(row):
-            cell = ws.cell(row=last_row + 1 + i, column=j + 1)
-            typed_cell = cast(Any, cell)
-
-            if j == 0:  # 日付列を日付型に変換
-                try:
-                    date_value = datetime.datetime.strptime(value, '%Y-%m-%d')
-                    typed_cell.value = date_value
-                    typed_cell.number_format = 'yyyy/mm/dd'
-                except ValueError:
-                    typed_cell.value = value
-            elif j == 1:  # 患者ID列
-                try:
-                    typed_cell.value = int(value.replace(',', ''))
-                    typed_cell.number_format = '0'
-                except ValueError:
-                    typed_cell.value = value
-            else:
-                typed_cell.value = value if value is not None else ""
-
+    write_rows(ws, last_row + 1, new_rows)
     apply_cell_formats(ws, last_row + 1)
 
     try:

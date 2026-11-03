@@ -6,6 +6,11 @@ import polars as pl
 
 from utils.config_manager import ConfigManager
 
+# 元CSVの列位置(0始まり)
+DOC_NAME_COL = 6  # G列: 文書名
+DOCTOR_NAME_COL = 9  # J列: 医師名
+DROP_COLS = {0, 1, 2, 8, 10}  # A〜C列, I列, K列(Excelに出力しない)
+
 
 def read_csv_with_encoding(file_path: str) -> Optional[pl.DataFrame]:
     """複数のエンコーディングを試してCSVファイルを読み込む"""
@@ -44,41 +49,25 @@ def process_csv_data(df: pl.DataFrame) -> pl.DataFrame:
     """CSVデータをExcel出力用に加工
     列名の一意化、スペースと*の除去、指定列の削除、除外データのフィルタリング"""
     # 列名を一意にするためインデックスと元の名前を組み合わせて識別子を作成
-    original_columns = df.columns
-    unique_columns = []
-    for i, col in enumerate(original_columns):
-        unique_columns.append(f"col_{i}_{col}")
-    df = df.select([
-        pl.col(old_name).alias(new_name)
-        for old_name, new_name in zip(original_columns, unique_columns)
-    ])
+    df = df.rename({name: f"col_{i}_{name}" for i, name in enumerate(df.columns)})
 
-    # 文書名(G列)と医師名(J列)のスペースと全角スペース、*を除去
+    doc_col = pl.col(df.columns[DOC_NAME_COL])
+    doctor_col = pl.col(df.columns[DOCTOR_NAME_COL])
+
+    # 文書名と医師名のスペースと全角スペース、*を除去
     df = df.with_columns([
-        pl.col(df.columns[6]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
-        pl.col(df.columns[9]).cast(pl.String).str.replace_all(r'[\s*　]', ''),
+        doc_col.cast(pl.String).str.replace_all(r'[\s*　]', ''),
+        doctor_col.cast(pl.String).str.replace_all(r'[\s*　]', ''),
     ])
-
-    # I列(8)とK列(10)を削除
-    columns_to_keep = [i for i in range(len(df.columns)) if i not in [8, 10]]
-    df = df.select([df.columns[i] for i in columns_to_keep])
-
-    # 最初の3列(A～C)を削除
-    df = df.select(df.columns[3:])
 
     config = ConfigManager()
-    exclude_docs = config.get_exclude_docs()
-    exclude_doctors = config.get_exclude_doctors()
+    for doc in config.get_exclude_docs():
+        df = df.filter(~doc_col.str.contains(doc, literal=True))
+    for doctor in config.get_exclude_doctors():
+        df = df.filter(~doctor_col.str.contains(doctor, literal=True))
 
-    if exclude_docs:
-        for doc in exclude_docs:
-            df = df.filter(~pl.col(df.columns[3]).cast(pl.String).str.contains(doc, literal=True))
-
-    if exclude_doctors:
-        for doctor in exclude_doctors:
-            df = df.filter(~pl.col(df.columns[5]).cast(pl.String).str.contains(doctor, literal=True))
-
-    return df
+    columns_to_keep = [name for i, name in enumerate(df.columns) if i not in DROP_COLS]
+    return df.select(columns_to_keep)
 
 
 def convert_date_format(df: pl.DataFrame) -> pl.DataFrame:

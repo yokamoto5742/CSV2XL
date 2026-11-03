@@ -16,10 +16,13 @@
 - **エラー処理(M3)**: services 層から `QMessageBox` を除き、失敗時は例外を送出するように変更。エラー表示は `MainWindow.import_csv` の 1 箇所に集約（CSV 未検出やファイルロック時も同じエラーダイアログで表示）
 - **エラー処理(M4)**: ログ出力して再送出するだけの `try/except` を `process_csv_data` / `process_completed_csv` / `sort_excel_data` / `backup_excel_file` / `ensure_directories_exist` から削除
 - **テスト**: `test_csv_processor.py` にあった `transfer_csv_to_excel` の重複テストを削除（`test_csv_excel_transfer.py` に集約）
+- **CSV 加工(M5)**: 元 CSV の列位置を `DOC_NAME_COL` / `DOCTOR_NAME_COL` / `DROP_COLS` 定数にし、列削除の前に除外フィルタを済ませるようにした（列番号が途中で変わらない）
+- **Excel 書き込み(M6)**: 約 125 行の `write_data_to_excel` を `make_row_key` / `read_existing_keys` / `filter_new_rows` / `write_rows` に分割。重複判定の日付は Excel 側・CSV 側とも `YYYY-MM-DD` にそろえた
 
 ### 削除
 
 - **ConfigManager**: 未使用の `set_processed_path` / `set_share_button_position` / `set_share_button_wait_time` / `set_backup_retention_days` / `_ensure_section` を削除
+- **依存関係**: M6 で `to_numpy()` を使わなくなったため `numpy` を削除
 
 ### 修正
 

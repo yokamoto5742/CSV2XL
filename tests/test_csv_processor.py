@@ -25,6 +25,18 @@ class TestCsvProcessor:
         })
     
     @patch('services.csv_processor.ConfigManager')
+    def test_process_csv_data_drops_columns(self, mock_config_manager):
+        """A～C列・I列・K列が削除され、残りの列が元の順で並ぶことのテスト"""
+        mock_config_manager.return_value.get_exclude_docs.return_value = []
+        mock_config_manager.return_value.get_exclude_doctors.return_value = []
+
+        result_df = process_csv_data(self.create_test_dataframe())
+
+        assert result_df.columns == [
+            "col_3_col3", "col_4_col4", "col_5_col5", "col_6_文書名", "col_7_日付", "col_9_医師名"
+        ]
+
+    @patch('services.csv_processor.ConfigManager')
     def test_process_csv_data_no_exclusions(self, mock_config_manager):
         """除外設定なしでのCSVデータ処理テスト"""
         # ConfigManagerのモック設定
