@@ -16,7 +16,7 @@
 ## 前提条件
 
 - **OS**: Windows 11
-- **Python**: 3.11 以上
+- **Python**: 3.13 以上
 - **メモリ**: 4GB 以上（推奨）
 
 ## インストール
@@ -27,27 +27,22 @@ git clone <repository-url>
 cd CSV2XL
 ```
 
-### 2. 仮想環境を作成
+### 2. 依存パッケージをインストール
+[uv](https://docs.astral.sh/uv/) を使用します。仮想環境（`.venv`）も自動で作成されます。
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
+uv sync
 ```
 
-### 3. 依存パッケージをインストール
+### 3. アプリケーションを起動
 ```bash
-pip install -r requirements.txt
-```
-
-### 4. アプリケーションを起動
-```bash
-python main.py
+uv run python main.py
 ```
 
 ## 使い方
 
 ### アプリケーション起動
 ```bash
-python main.py
+uv run python main.py
 ```
 
 ### 基本的なワークフロー
@@ -98,12 +93,13 @@ CSV2XL/
 ├── utils/                    # ユーティリティ
 │   ├── config_manager.py     # 設定ファイル管理
 │   └── config.ini            # 設定ファイル
-├── scripts/                  # ビルド・補助スクリプト
-│   └── version_manager.py    # バージョン自動更新
+├── scripts/                  # 補助スクリプト
+│   └── project_structure.py  # プロジェクト構造の出力
 ├── tests/                    # ユニットテスト
 ├── main.py                   # エントリーポイント
 ├── build.py                  # 実行ファイル生成スクリプト
-└── requirements.txt          # Python依存パッケージ
+├── pyproject.toml            # プロジェクト設定・依存パッケージ
+└── uv.lock                   # 依存パッケージのロックファイル
 ```
 
 ## 主要機能の詳細
@@ -157,8 +153,8 @@ excel_path = C:\path\to\file.xlsm
 backup_path = C:\path\to\backup
 processed_path = C:\path\to\processed
 
-[FileRetention]
-backup_retention_days = 14
+[Backup]
+retention_days = 14
 
 [ButtonPosition]
 share_button_x = 1450
@@ -169,7 +165,7 @@ share_button_wait_time = 1
 - **Appearance**: UI外観設定（フォントサイズ、ウィンドウサイズ）
 - **ExcludeDocs/ExcludeDoctors**: フィルタリング対象
 - **Paths**: ファイル・フォルダパス
-- **FileRetention**: バックアップ・処理済みCSVの保持期間（日数）
+- **Backup**: バックアップ・処理済みCSVの保持期間（日数）
 - **ButtonPosition**: 自動化機能の座標設定
 
 ## 開発情報
@@ -177,9 +173,10 @@ share_button_wait_time = 1
 ### テスト実行
 
 ```bash
-python -m pytest                        # 全テストを実行
-python -m pytest tests/test_csv_processor.py  # 特定テストを実行
-python -m pytest --cov                 # カバレッジ付きで実行
+uv run pytest tests/ -v --tb=short                # 全テストを実行
+uv run pytest tests/test_csv_processor.py -v      # 特定テストを実行
+uv run pytest tests/ --cov --cov-report=term-missing  # カバレッジ付きで実行
+uv run pyright                                    # 型チェック
 ```
 
 ### 実行ファイル生成
@@ -188,19 +185,18 @@ python -m pytest --cov                 # カバレッジ付きで実行
 python build.py
 ```
 
-バージョンを自動更新し、PyInstallerで実行ファイルを生成します。出力先は `dist/` フォルダです。
+PyInstallerで実行ファイルを生成します。出力先は `dist/` フォルダです。バージョンは自動更新されません。
 
 ### バージョン管理
 
-`app/__init__.py` で管理し、ビルド時に自動更新：
+`app/__init__.py` の `__version__` と `pyproject.toml` の `version` を手動で同じ値にそろえます：
 ```python
-__version__ = "1.1.3"
-__date__ = "2025-12-11"
+__version__ = "1.1.4"
 ```
 
 ### 主要な依存パッケージ
 
-詳細は `requirements.txt` を参照：
+詳細は `pyproject.toml` を参照：
 
 - **PyQt6** (6.8.0): GUIフレームワーク
 - **openpyxl** (3.1.5): Excel操作

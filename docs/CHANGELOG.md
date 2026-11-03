@@ -6,6 +6,22 @@
 バージョン管理は[Semantic Versioning](https://semver.org/lang/ja/)に従っています。
 
 
+## [1.1.4] - 2026-11-03
+
+### 変更
+
+- **パッケージ管理**: uv に移行し、依存関係を pyproject.toml と uv.lock で管理するように変更
+- **README.md**: uv でのインストール・実行手順、設定ファイルの `[Backup]` セクション、対応 Python バージョン（3.13 以上）を実態に合わせて更新
+- **Stop フック**: 通知処理を `.claude/hooks/stop-notification.ps1` の呼び出しに統一
+
+### 修正
+
+- **pyright 設定**: 型チェック対象の `service` を `services` に修正し、services ディレクトリが型チェックされるようにした
+
+### 削除
+
+- **requirements.txt**: pyproject.toml に統合したため削除
+
 ## [1.1.3] - 2025-12-11
 
 ### 追加

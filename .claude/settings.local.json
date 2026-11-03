@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('タスクが完了しました', 'Claude Code', 'OK', 'Information')\""
+            "command": "powershell -File .claude/hooks/stop-notification.ps1"
           }
         ]
       }
