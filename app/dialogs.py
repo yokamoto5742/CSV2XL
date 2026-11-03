@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 from utils.config_manager import ConfigManager
 
 class ExcludeItemDialog(QDialog):
-    def __init__(self, title, item_label, config_section, parent=None):
+    def __init__(self, title, config_section, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -20,11 +20,11 @@ class ExcludeItemDialog(QDialog):
         layout = QVBoxLayout()
 
         self.input_field = QLineEdit()
-        layout.addWidget(QLabel(f"{item_label}を入力:"))
+        layout.addWidget(QLabel(f"{title}を入力:"))
         layout.addWidget(self.input_field)
 
         self.item_list = QListWidget()
-        layout.addWidget(QLabel(f"登録済み{item_label}:"))
+        layout.addWidget(QLabel(f"登録済み{title}:"))
         layout.addWidget(self.item_list)
 
         buttons = QDialogButtonBox(
@@ -50,11 +50,7 @@ class ExcludeItemDialog(QDialog):
         self.load_items()
 
     def load_items(self):
-        if self.config_section in self.config.config:
-            items = self.config.config[self.config_section].get('list', '').split(',')
-            for item in items:
-                if item.strip():
-                    self.item_list.addItem(item.strip())
+        self.item_list.addItems(self.config.get_list(self.config_section))
 
     def add_item(self):
         item_name = self.input_field.text().strip()
@@ -74,21 +70,18 @@ class ExcludeItemDialog(QDialog):
             if item is not None:
                 items.append(item.text())
 
-        if self.config_section not in self.config.config:
-            self.config.config[self.config_section] = {}
-        self.config.config[self.config_section]['list'] = ','.join(items)
-        self.config.save_config()
+        self.config.set_list(self.config_section, items)
         super().accept()
 
 
 class ExcludeDocsDialog(ExcludeItemDialog):
     def __init__(self, parent=None):
-        super().__init__("除外する文書名", "除外する文書名", "ExcludeDocs", parent)
+        super().__init__("除外する文書名", "ExcludeDocs", parent)
 
 
 class ExcludeDoctorsDialog(ExcludeItemDialog):
     def __init__(self, parent=None):
-        super().__init__("除外する医師名", "除外する医師名", "ExcludeDoctors", parent)
+        super().__init__("除外する医師名", "ExcludeDoctors", parent)
 
 
 class FolderPathDialog(QDialog):

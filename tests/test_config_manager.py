@@ -3,7 +3,41 @@ from pathlib import Path
 
 import pytest
 
-from utils.config_manager import get_config_path
+from utils.config_manager import ConfigManager, get_config_path
+
+
+@pytest.fixture
+def config(tmp_path: Path) -> ConfigManager:
+    config_file = tmp_path / 'config.ini'
+    config_file.write_text('', encoding='utf-8')
+    return ConfigManager(config_file)
+
+
+class TestConfigManager:
+    def test_defaults_without_sections(self, config: ConfigManager) -> None:
+        """セクションが無くても既定値を返す"""
+        assert config.get_font_size() == 9
+        assert config.get_window_size() == (300, 200)
+        assert config.get_share_button_position() == (1450, 180)
+        assert config.get_backup_retention_days() == 7
+        assert config.get_exclude_docs() == []
+        assert config.get_backup_path() == r"C:\Shinseikai\CSV2XL\backup"
+
+    def test_set_creates_section_and_saves(self, config: ConfigManager) -> None:
+        """setter はセクションを作成してファイルに保存する"""
+        config.set_window_size(400, 300)
+        config.set_backup_path(r"D:\backup")
+
+        reloaded = ConfigManager(config.config_file)
+        assert reloaded.get_window_size() == (400, 300)
+        assert reloaded.get_backup_path() == r"D:\backup"
+
+    def test_list_round_trip(self, config: ConfigManager) -> None:
+        """リストの保存と読み込み(空白や空要素は除く)"""
+        config.set_list('ExcludeDoctors', ['田中', ' 山田 ', ''])
+
+        reloaded = ConfigManager(config.config_file)
+        assert reloaded.get_exclude_doctors() == ['田中', '山田']
 
 
 class TestGetConfigPath:

@@ -60,14 +60,14 @@ def backup_config():
 class TestExcludeItemDialog:
     def test_init(self, app, backup_config):
         """ExcludeItemDialogの初期化テスト"""
-        dialog = ExcludeItemDialog("テストダイアログ", "テスト項目", "TestSection")
+        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
         assert dialog.windowTitle() == "テストダイアログ"
         assert dialog.config_section == "TestSection"
         assert dialog.item_list is not None
 
     def test_add_item(self, app, backup_config):
         """項目追加機能のテスト"""
-        dialog = ExcludeItemDialog("テストダイアログ", "テスト項目", "TestSection")
+        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
 
         # 項目を追加
         dialog.input_field.setText("テスト項目1")
@@ -83,7 +83,7 @@ class TestExcludeItemDialog:
 
     def test_delete_selected(self, app, backup_config):
         """項目削除機能のテスト"""
-        dialog = ExcludeItemDialog("テストダイアログ", "テスト項目", "TestSection")
+        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
 
         # 項目を追加
         dialog.input_field.setText("テスト項目1")
@@ -103,14 +103,10 @@ class TestExcludeItemDialog:
     def test_load_items(self, app, backup_config):
         """設定ファイルからの項目読み込みテスト"""
         # 設定ファイルにテスト用セクションと項目を追加
-        config = ConfigManager()
-        if 'TestSection' not in config.config:
-            config.config['TestSection'] = {}
-        config.config['TestSection']['list'] = 'アイテム1,アイテム2,アイテム3'
-        config.save_config()
+        ConfigManager().set_list('TestSection', ['アイテム1', 'アイテム2', 'アイテム3'])
 
         # ダイアログを初期化して項目が読み込まれるか確認
-        dialog = ExcludeItemDialog("テストダイアログ", "テスト項目", "TestSection")
+        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
 
         assert dialog.item_list.count() == 3
         assert get_item_text(dialog.item_list, 0) == "アイテム1"
@@ -119,7 +115,7 @@ class TestExcludeItemDialog:
 
     def test_accept(self, app, backup_config):
         """ダイアログ確定時の設定保存テスト"""
-        dialog = ExcludeItemDialog("テストダイアログ", "テスト項目", "TestSection")
+        dialog = ExcludeItemDialog("テストダイアログ", "TestSection")
 
         # 項目を追加
         dialog.input_field.setText("新しい項目1")
@@ -133,11 +129,7 @@ class TestExcludeItemDialog:
             mock_accept.assert_called_once()
 
         # 設定が保存されたことを確認
-        config = ConfigManager()
-        saved_items = config.config['TestSection'].get('list', '').split(',')
-        assert len(saved_items) == 2
-        assert "新しい項目1" in saved_items
-        assert "新しい項目2" in saved_items
+        assert ConfigManager().get_list('TestSection') == ["新しい項目1", "新しい項目2"]
 
 
 class TestExcludeDocsDialog:

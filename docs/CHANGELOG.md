@@ -8,6 +8,16 @@
 
 ## [1.2.0] - 2026-11-03
 
+### 変更
+
+- **ConfigManager(M1)**: getter の既定値の二重定義を削除し、setter を `_set` に共通化。既定フォルダを `DEFAULT_BASE_DIR` 定数にまとめた
+- **ConfigManager(M2)**: カンマ区切りリストを読み書きする `get_list` / `set_list` を追加し、除外ダイアログが `config.config` を直接触らないようにした。`ExcludeItemDialog` の引数 `item_label` を `title` に統合
+- **ConfigManager**: 保存失敗時の例外メッセージを `Failed to save config` に修正
+
+### 削除
+
+- **ConfigManager**: 未使用の `set_processed_path` / `set_share_button_position` / `set_share_button_wait_time` / `set_backup_retention_days` / `_ensure_section` を削除
+
 ### 修正
 
 - **設定ファイル(H1)**: exe 実行時は exe と同じフォルダの `config.ini` を読み書きするように変更（無ければ同梱版をコピー）。ダイアログで変えた設定が再ビルドや onefile 構成で消えないようにするため
