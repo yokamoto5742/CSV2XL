@@ -5,11 +5,6 @@
 フォーマットは[Keep a Changelog](https://keepachangelog.com/ja/1.1.0/)に基づいており、
 バージョン管理は[Semantic Versioning](https://semver.org/lang/ja/)に従っています。
 
-## [未リリース (Unreleased)]
-
-### 変更
-
-- **テスト(test_file_manager.py)**: ConfigManager をモック化し、バックアップ保持期間の設定値を使用するテストケースに更新
 
 ## [1.1.3] - 2025-12-11
 
@@ -21,7 +16,7 @@
 
 - **pyrightconfig.json**: servicesディレクトリを型チェック対象に含める設定を更新
 - **excel_processor テスト**: pathlib.Pathを使用した実装に変更
-- **app/__init__.py**: バージョン情報と日付を更新
+- **テスト(test_file_manager.py)**: ConfigManager をモック化し、バックアップ保持期間の設定値を使用するテストケースに更新
 
 ### 修正
 
