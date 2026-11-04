@@ -8,7 +8,7 @@ import pytest
 from PyQt6.QtWidgets import QApplication, QComboBox
 
 from app.document_table_model import STAFF_COLUMN
-from app.document_window import DocumentListWindow, StaffComboDelegate
+from app.document_window import DocumentListWidget, StaffComboDelegate
 from services.database import connect
 from services.document_repository import DocumentRepository
 from services.list_repository import STAFF, ListRepository
@@ -24,70 +24,74 @@ def app():
 
 
 @pytest.fixture
-def window(app, connection: sqlite3.Connection) -> DocumentListWindow:
+def window(app, connection: sqlite3.Connection) -> DocumentListWidget:
     DocumentRepository(connection).add_new_documents([
         make_new_document(100, '2025-01-10'),
         make_new_document(200, '2025-01-11'),
         make_new_document(100, '2025-01-12'),
     ])
     ListRepository(connection).set_items(STAFF, ['山本', '植田'])
-    list_window = DocumentListWindow(connection)
+    list_window = DocumentListWidget(connection)
     list_window.refresh_timer.stop()
     list_window.load_initial()
     return list_window
 
 
-def selected_row(window: DocumentListWindow) -> int:
+def selected_row(window: DocumentListWidget) -> int:
     selection_model = window.table.selectionModel()
     assert selection_model is not None
     return selection_model.selectedRows()[0].row()
 
 
+@pytest.fixture
+def statuses(window: DocumentListWidget) -> list[str]:
+    """search_status_changed で通知された文字列"""
+    received: list[str] = []
+    window.search_status_changed.connect(received.append)
+    return received
+
+
 class TestSearch:
-    def test_search_and_cycle(self, window: DocumentListWindow):
+    def test_search_and_cycle(self, window: DocumentListWidget, statuses: list[str]):
         """見つかった行を選び、次へ・前へで順に移る(端まで行ったら先頭に戻る)"""
-        window.patient_id_input.setText('100')
-        window.search()
+        window.search('100')
         assert selected_row(window) == 0
-        assert window.search_result_label.text() == "1/2件"
+        assert statuses[-1] == "1/2件"
 
         window.show_next_hit()
         assert selected_row(window) == 2
-        assert window.search_result_label.text() == "2/2件"
+        assert statuses[-1] == "2/2件"
 
         window.show_next_hit()
-        assert window.search_result_label.text() == "1/2件"
+        assert statuses[-1] == "1/2件"
 
         window.show_previous_hit()
-        assert window.search_result_label.text() == "2/2件"
+        assert statuses[-1] == "2/2件"
 
     @patch('app.document_window.QMessageBox.information')
-    def test_not_found(self, mock_info, window: DocumentListWindow):
-        window.patient_id_input.setText('999')
-        window.search()
+    def test_not_found(self, mock_info, window: DocumentListWidget, statuses: list[str]):
+        window.search('999')
 
         assert mock_info.call_args[0][2] == "該当する患者IDは見つかりませんでした。"
-        assert window.search_result_label.text() == ""
+        assert statuses[-1] == ""
 
     @patch('app.document_window.QMessageBox.warning')
-    def test_not_a_number(self, mock_warning, window: DocumentListWindow):
-        window.patient_id_input.setText('abc')
-        window.search()
+    def test_not_a_number(self, mock_warning, window: DocumentListWidget):
+        window.search('abc')
 
         assert mock_warning.call_args[0][2] == "数値を入力してください。"
 
-    def test_sort_clears_search(self, window: DocumentListWindow):
-        window.patient_id_input.setText('100')
-        window.search()
+    def test_sort_clears_search(self, window: DocumentListWidget, statuses: list[str]):
+        window.search('100')
 
         window.model.sort(1)
 
         assert window.search_hits == []
-        assert window.search_result_label.text() == ""
+        assert statuses[-1] == ""
 
 
 class TestRefresh:
-    def test_refresh_when_other_connection_changes(self, window: DocumentListWindow, tmp_path: Path):
+    def test_refresh_when_other_connection_changes(self, window: DocumentListWidget, tmp_path: Path):
         """他の端末(別の接続)で追加された行を自動更新で読み込む"""
         other = connect(str(tmp_path / 'test.db'))
         try:
@@ -99,13 +103,13 @@ class TestRefresh:
 
         assert window.model.rowCount() == 4
 
-    def test_no_reload_without_changes(self, window: DocumentListWindow):
+    def test_no_reload_without_changes(self, window: DocumentListWidget):
         with patch.object(window.model, 'load') as mock_load:
             window.refresh_if_changed()
         mock_load.assert_not_called()
 
     @patch('app.document_window.QMessageBox.warning')
-    def test_conflict_reloads(self, mock_warning, window: DocumentListWindow, tmp_path: Path):
+    def test_conflict_reloads(self, mock_warning, window: DocumentListWidget, tmp_path: Path):
         """他の端末が先に更新した行を保存しようとしたら、警告して読み直す"""
         other = connect(str(tmp_path / 'test.db'))
         try:
@@ -123,7 +127,7 @@ class TestRefresh:
 
 
 class TestStaffComboDelegate:
-    def test_editor_lists_staff_and_keeps_current_value(self, window: DocumentListWindow):
+    def test_editor_lists_staff_and_keeps_current_value(self, window: DocumentListWidget):
         """リストに無い担当者が入力済みでも、その値を選択肢に残す"""
         window.model.setData(window.model.index(0, STAFF_COLUMN), '退職者')
         delegate = StaffComboDelegate(window)
@@ -134,7 +138,7 @@ class TestStaffComboDelegate:
         assert [combo.itemText(i) for i in range(combo.count())] == ['', '山本', '植田', '退職者']
         assert combo.currentText() == '退職者'
 
-    def test_set_model_data(self, window: DocumentListWindow):
+    def test_set_model_data(self, window: DocumentListWidget):
         delegate = StaffComboDelegate(window)
         combo = QComboBox()
         combo.addItems(['', '山本'])

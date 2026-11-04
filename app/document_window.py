@@ -1,10 +1,9 @@
 import sqlite3
 
-from PyQt6.QtCore import QAbstractItemModel, QModelIndex, QPersistentModelIndex, Qt, QTimer
+from PyQt6.QtCore import QAbstractItemModel, QModelIndex, QPersistentModelIndex, Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QComboBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
-    QMessageBox, QPushButton, QStyledItemDelegate, QStyleOptionViewItem, QTableView,
-    QVBoxLayout, QWidget
+    QAbstractItemView, QComboBox, QMessageBox, QStyledItemDelegate, QStyleOptionViewItem,
+    QTableView, QVBoxLayout, QWidget
 )
 
 from app.document_table_model import STAFF_COLUMN, DocumentTableModel
@@ -20,7 +19,7 @@ AUTO_REFRESH_INTERVAL_MS = 5000
 class StaffComboDelegate(QStyledItemDelegate):
     """担当者名をドロップダウンで選ぶ"""
 
-    def __init__(self, window: 'DocumentListWindow') -> None:
+    def __init__(self, window: 'DocumentListWidget') -> None:
         super().__init__(window)
         self.window = window
 
@@ -52,12 +51,14 @@ class StaffComboDelegate(QStyledItemDelegate):
             model.setData(model.index(index.row(), index.column()), editor.currentText(), Qt.ItemDataRole.EditRole)
 
 
-class DocumentListWindow(QMainWindow):
+class DocumentListWidget(QWidget):
     """医療文書担当一覧の表示・編集・患者ID検索"""
+
+    # 検索結果の位置(例: "1/3件")。検索結果が無いときは空文字
+    search_status_changed = pyqtSignal(str)
 
     def __init__(self, connection: sqlite3.Connection, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("医療文書担当一覧")
         self.list_repository = ListRepository(connection)
         self.repository = DocumentRepository(connection)
         self.model = DocumentTableModel(self.repository)
@@ -66,12 +67,10 @@ class DocumentListWindow(QMainWindow):
         self.search_position = 0
         self.last_data_version = -1
 
-        central_widget = QWidget()
-        layout = QVBoxLayout(central_widget)
-        layout.addLayout(self.create_toolbar())
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.table = self.create_table()
         layout.addWidget(self.table)
-        self.setCentralWidget(central_widget)
 
         # セルの確定処理の途中で表を読み直さないよう、確定が終わってから処理する
         self.model.error_occurred.connect(lambda message: QTimer.singleShot(0, lambda: self.show_error(message)))
@@ -82,28 +81,6 @@ class DocumentListWindow(QMainWindow):
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.refresh_if_changed)
         self.refresh_timer.start(AUTO_REFRESH_INTERVAL_MS)
-
-    def create_toolbar(self) -> QHBoxLayout:
-        toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("患者ID:"))
-        self.patient_id_input = QLineEdit()
-        self.patient_id_input.setFixedWidth(120)
-        self.patient_id_input.returnPressed.connect(self.search)
-        toolbar.addWidget(self.patient_id_input)
-
-        for text, slot in (("検索", self.search), ("前へ", self.show_previous_hit), ("次へ", self.show_next_hit)):
-            button = QPushButton(text)
-            button.clicked.connect(slot)
-            toolbar.addWidget(button)
-
-        self.search_result_label = QLabel("")
-        toolbar.addWidget(self.search_result_label)
-        toolbar.addStretch()
-
-        reload_button = QPushButton("再読み込み")
-        reload_button.clicked.connect(self.reload)
-        toolbar.addWidget(reload_button)
-        return toolbar
 
     def create_table(self) -> QTableView:
         table = QTableView()
@@ -156,8 +133,8 @@ class DocumentListWindow(QMainWindow):
         if changed:
             self.reload()
 
-    def search(self) -> None:
-        patient_id = parse_patient_id(self.patient_id_input.text())
+    def search(self, text: str) -> None:
+        patient_id = parse_patient_id(text)
         if patient_id is None:
             QMessageBox.warning(self, "患者ID検索", "数値を入力してください。")
             return
@@ -184,13 +161,13 @@ class DocumentListWindow(QMainWindow):
         row = self.search_hits[self.search_position]
         self.table.selectRow(row)
         self.table.scrollTo(self.model.index(row, 0), QAbstractItemView.ScrollHint.PositionAtCenter)
-        self.search_result_label.setText(f"{self.search_position + 1}/{len(self.search_hits)}件")
+        self.search_status_changed.emit(f"{self.search_position + 1}/{len(self.search_hits)}件")
 
     def clear_search(self) -> None:
         # 並び替えや読み直しで行の位置が変わるため、検索結果を捨てる
         self.search_hits = []
         self.search_position = 0
-        self.search_result_label.setText("")
+        self.search_status_changed.emit("")
 
     def show_error(self, message: str) -> None:
         QMessageBox.warning(self, "エラー", message)

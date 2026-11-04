@@ -3,7 +3,8 @@ import pytest
 import configparser
 from unittest.mock import patch, MagicMock
 
-from PyQt6.QtWidgets import QApplication, QPushButton
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QApplication, QPushButton, QWidget
 
 from app.main_window import MainWindow
 from utils.config_manager import ConfigManager, CONFIG_PATH
@@ -52,57 +53,81 @@ def backup_config():
         config.write(f)
 
 
+class FakeDocumentListWidget(QWidget):
+    """DB を読まない担当一覧の代わり"""
+    search_status_changed = pyqtSignal(str)
+
+    def __init__(self, connection):
+        super().__init__()
+        self.connection = connection
+        self.load_initial = MagicMock()
+        self.reload = MagicMock()
+        self.search = MagicMock()
+        self.show_next_hit = MagicMock()
+        self.show_previous_hit = MagicMock()
+        self.refresh_timer = MagicMock()
+
+
 @pytest.fixture
 def db_connect():
-    """本物の DB に接続しないよう connect をモックする"""
-    with patch('app.main_window.connect') as mock_connect:
+    """本物の DB に接続しないよう connect と担当一覧をモックする"""
+    with patch('app.main_window.connect') as mock_connect, \
+            patch('app.main_window.DocumentListWidget', FakeDocumentListWidget):
         yield mock_connect
 
 
+def fake_widget(window: MainWindow) -> FakeDocumentListWidget:
+    document_widget = window.document_widget
+    assert isinstance(document_widget, FakeDocumentListWidget)
+    return document_widget
+
+
+def find_button(window: MainWindow, text: str) -> QPushButton:
+    for button in window.findChildren(QPushButton):
+        if button.text() == text:
+            return button
+    raise AssertionError(f"{text} ボタンがありません")
+
+
 class TestMainWindow:
-    def test_init(self, app, backup_config):
-        """MainWindowの初期化テスト"""
+    def test_init(self, app, backup_config, db_connect):
+        """起動時に設定を反映し、DB に接続して担当一覧を同じ画面に表示する"""
         window = MainWindow()
 
-        # ウィンドウタイトルを確認
-        assert window.windowTitle() == f"CSV取込アプリ v{__version__}"
+        assert window.windowTitle() == f"医療文書担当一覧 v{__version__}"
+        assert window.font().pointSize() == ConfigManager().get_font_size()
 
-        # 設定に基づくフォントサイズとウィンドウサイズの確認
-        config = ConfigManager()
-        font_size = config.get_font_size()
-        assert window.font().pointSize() == font_size
+        db_connect.assert_called_once()
+        document_widget = fake_widget(window)
+        assert document_widget.connection is db_connect.return_value
+        document_widget.load_initial.assert_called_once()
+        assert window.content_layout.indexOf(document_widget) >= 0
 
-        window_size = config.get_window_size()
-        assert window.width() == window_size[0]
-        assert window.height() == window_size[1]
+        for text in ("検索", "前へ", "次へ", "CSV取り込み", "文書名", "医師名",
+                     "担当者名", "画面サイズ", "フォルダパス", "閉じる"):
+            find_button(window, text)
 
-        # 必要なウィジェットが存在することを確認
-        central_widget = window.centralWidget()
-        assert central_widget is not None
+    @patch('app.main_window.QMessageBox.critical')
+    def test_open_document_list_error(self, mock_critical, app, backup_config, db_connect):
+        """DB に接続できなくても画面は開き、エラーを表示する"""
+        db_connect.side_effect = Exception("接続エラー")
 
-        # レイアウト内のボタンの数を確認
-        layout = central_widget.layout()
-        assert layout is not None
+        window = MainWindow()
 
-        # (タイトルラベル、CSVボタン、担当一覧ボタン、設定ラベル、除外文書ボタン、除外医師ボタン、
-        #  担当者名ボタン、外観ボタン、フォルダボタン、閉じるボタン)
-        assert layout.count() == 10
+        assert window.document_widget is None
+        assert "接続エラー" in mock_critical.call_args[0][2]
 
-        # 起動時には DB に接続しない
-        assert window.connection is None
-
-    @patch('app.main_window.MainWindow.show_document_window')
     @patch('app.main_window.QMessageBox.information')
     @patch('app.main_window.import_csv_to_database', return_value=3)
-    def test_import_csv_success(self, mock_import, mock_info, mock_show, app, backup_config, db_connect):
-        """CSVインポート成功時は件数を表示して担当一覧を開く"""
+    def test_import_csv_success(self, mock_import, mock_info, app, backup_config, db_connect):
+        """CSVインポート成功時は件数を表示して担当一覧を読み直す"""
         window = MainWindow()
 
         window.import_csv()
 
         mock_import.assert_called_once_with(db_connect.return_value)
         assert "3件" in mock_info.call_args[0][2]
-        mock_show.assert_called_once()
+        fake_widget(window).reload.assert_called_once()
 
     @patch('app.main_window.import_csv_to_database')
     @patch('app.main_window.QMessageBox.critical')
@@ -128,22 +153,25 @@ class TestMainWindow:
         db_connect.assert_called_once()
 
         window.close_connection()
+        assert window.document_widget is None
         window.get_connection()
         assert db_connect.call_count == 2
 
-    @patch('app.main_window.DocumentListWindow')
-    def test_show_document_window(self, mock_window_class, app, backup_config, db_connect):
-        """初回は担当一覧を作って表示し、2回目は読み直す"""
+    def test_search(self, app, backup_config, db_connect):
+        """検索欄の患者IDで担当一覧を検索し、件数を左側に表示する"""
         window = MainWindow()
+        document_widget = fake_widget(window)
 
-        window.show_document_window()
-        window.show_document_window()
+        window.patient_id_input.setText('100')
+        find_button(window, "検索").click()
+        find_button(window, "次へ").click()
+        find_button(window, "前へ").click()
+        document_widget.search_status_changed.emit("1/2件")
 
-        mock_window_class.assert_called_once_with(db_connect.return_value, window)
-        document_window = mock_window_class.return_value
-        document_window.load_initial.assert_called_once()
-        document_window.reload.assert_called_once()
-        assert document_window.showMaximized.call_count == 2
+        document_widget.search.assert_called_once_with('100')
+        document_widget.show_next_hit.assert_called_once()
+        document_widget.show_previous_hit.assert_called_once()
+        assert window.search_result_label.text() == "1/2件"
 
     @pytest.mark.parametrize("method_name, dialog_name", [
         ("show_exclude_docs_dialog", "ExcludeDocsDialog"),
@@ -162,45 +190,35 @@ class TestMainWindow:
         mock_dialog.return_value.exec.assert_called_once()
 
     @patch('app.main_window.AppearanceDialog')
-    def test_show_appearance_dialog(self, mock_dialog, app, backup_config):
+    def test_show_appearance_dialog(self, mock_dialog, app, backup_config, db_connect):
         """外観設定ダイアログ表示テスト"""
-        mock_instance = MagicMock()
-        mock_dialog.return_value = mock_instance
-
         window = MainWindow()
         window.show_appearance_dialog()
 
-        # ダイアログが作成され、execが呼ばれたことを確認
         mock_dialog.assert_called_once_with(window)
-        mock_instance.exec.assert_called_once()
+        mock_dialog.return_value.exec.assert_called_once()
 
     @patch('app.main_window.FolderPathDialog')
-    def test_show_folder_path_dialog(self, mock_dialog, app, backup_config):
-        """フォルダパスダイアログ表示テスト"""
-        mock_instance = MagicMock()
-        mock_dialog.return_value = mock_instance
-
+    def test_show_folder_path_dialog(self, mock_dialog, app, backup_config, db_connect):
+        """フォルダの場所を保存したら、DB に接続し直して担当一覧を作り直す"""
+        mock_dialog.return_value.exec.return_value = 1
         window = MainWindow()
+        first_widget = window.document_widget
+
         window.show_folder_path_dialog()
 
-        # ダイアログが作成され、execが呼ばれたことを確認
         mock_dialog.assert_called_once_with(window)
-        mock_instance.exec.assert_called_once()
+        assert db_connect.call_count == 2
+        assert window.document_widget is not None
+        assert window.document_widget is not first_widget
 
     @patch('app.main_window.QMainWindow.close')
-    def test_close_button(self, mock_close, app, backup_config):
+    def test_close_button(self, mock_close, app, backup_config, db_connect):
         """閉じるボタンのテスト"""
         window = MainWindow()
 
-        # 閉じるボタンを探して押下
-        close_button = None
-        for button in window.findChildren(QPushButton):
-            if button.text() == "閉じる":
-                close_button = button
-                break
+        find_button(window, "閉じる").click()
 
-        assert close_button is not None
-        close_button.click()
-
-        # closeメソッドが呼ばれたことを確認
         mock_close.assert_called_once()
+
+
