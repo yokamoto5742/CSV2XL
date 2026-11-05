@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
-from app.main_window import MainWindow
+from app.main_window import MainWindow, apply_app_font_size
 from services.xlsm_import import XlsmImportResult
 from utils.config_manager import ConfigManager, CONFIG_PATH
 from app import __version__
@@ -64,8 +64,10 @@ class FakeDocumentListWidget(QWidget):
         self.load_initial = MagicMock()
         self.reload = MagicMock()
         self.search = MagicMock()
-        self.show_next_hit = MagicMock()
-        self.show_previous_hit = MagicMock()
+        self.clear_search = MagicMock()
+        self.set_column_widths = MagicMock()
+        self.column_widths = MagicMock(return_value=[90, 70, 110, 300, 100, 90, 90, 100, 200])
+        self.apply_font_size = MagicMock()
         self.refresh_timer = MagicMock()
         self.add_document = MagicMock()
         self.delete_selected = MagicMock()
@@ -110,12 +112,11 @@ class TestMainWindow:
         assert QApplication.font().pointSize() == ConfigManager().get_font_size()
 
         assert all(__version__ not in label.text() for label in window.findChildren(QLabel))
-        for text in ("検索", "前へ", "次へ", "CSV取り込み", "行の追加", "行の削除", "文書名", "医師名",
-                     "担当者名", "設定", "閉じる"):
+        for text in ("検索", "解除", "CSV取り込み", "行の追加", "行の削除", "文書名", "医師名", "設定", "閉じる"):
             find_button(window, text)
-        # xlsm取り込み・CSV出力・フォルダパスは設定ダイアログに移した
+        # xlsm取り込み・CSV出力・フォルダパス・担当者名は設定ダイアログに移した
         texts = [button.text() for button in window.findChildren(QPushButton)]
-        assert not {"xlsm取り込み", "CSV出力", "フォルダパス", "画面サイズ"} & set(texts)
+        assert not {"xlsm取り込み", "CSV出力", "フォルダパス", "担当者名", "前へ", "次へ"} & set(texts)
 
     @patch('app.main_window.QMessageBox.critical')
     def test_open_document_list_error(self, mock_critical, app, backup_config, db_connect):
@@ -205,20 +206,20 @@ class TestMainWindow:
         assert db_connect.call_count == 2
 
     def test_search(self, app, backup_config, db_connect):
-        """検索欄の患者IDで担当一覧を検索し、件数を左側に表示する"""
+        """検索欄の患者IDで担当一覧を絞り込み、件数を左側に表示する。解除で検索欄も空にする"""
         window = MainWindow()
         document_widget = fake_widget(window)
 
         window.patient_id_input.setText('100')
         find_button(window, "検索").click()
-        find_button(window, "次へ").click()
-        find_button(window, "前へ").click()
-        document_widget.search_status_changed.emit("1/2件")
+        document_widget.search_status_changed.emit("患者ID 100: 2件")
 
         document_widget.search.assert_called_once_with('100')
-        document_widget.show_next_hit.assert_called_once()
-        document_widget.show_previous_hit.assert_called_once()
-        assert window.search_result_label.text() == "1/2件"
+        assert window.search_result_label.text() == "患者ID 100: 2件"
+
+        find_button(window, "解除").click()
+        document_widget.clear_search.assert_called_once()
+        assert window.patient_id_input.text() == ''
 
     @pytest.mark.parametrize("method_name, dialog_name", [
         ("show_exclude_docs_dialog", "ExcludeDocsDialog"),
@@ -238,16 +239,55 @@ class TestMainWindow:
 
     @patch('app.main_window.SettingsDialog')
     def test_show_settings_dialog(self, mock_dialog, app, backup_config, db_connect):
-        """設定ダイアログに xlsm取り込み・CSV出力・フォルダパスを渡す"""
+        """設定ダイアログに xlsm取り込み・CSV出力・フォルダパス・フォントサイズ・担当者名を渡す"""
         window = MainWindow()
 
         find_button(window, "設定").click()
 
         actions, parent = mock_dialog.call_args[0]
         assert actions == [("xlsm取り込み", window.import_xlsm), ("CSV出力", window.export_csv),
-                           ("フォルダパス", window.show_folder_path_dialog)]
+                           ("フォルダパス", window.show_folder_path_dialog),
+                           ("フォントサイズ", window.show_font_size_dialog),
+                           ("担当者名", window.show_staff_names_dialog)]
         assert parent is window
         mock_dialog.return_value.exec.assert_called_once()
+
+    @patch('app.main_window.FontSizeDialog')
+    def test_font_size_is_applied_and_saved(self, mock_dialog, app, backup_config, db_connect):
+        """OK なら保存し、作成済みの画面(スタイルシートを設定した左パネルのボタンも)にすぐ反映する"""
+        window = MainWindow()
+        original_size = ConfigManager().get_font_size()
+        new_size = original_size + 2
+        mock_dialog.return_value.exec.return_value = 1
+        mock_dialog.return_value.font_size.return_value = new_size
+
+        window.show_font_size_dialog()
+
+        assert ConfigManager().get_font_size() == new_size
+        assert find_button(window, "CSV取り込み").font().pointSize() == new_size
+        fake_widget(window).apply_font_size.assert_called_once()
+        apply_app_font_size(original_size)
+
+    @patch('app.main_window.FontSizeDialog')
+    def test_font_size_cancel(self, mock_dialog, app, backup_config, db_connect):
+        window = MainWindow()
+        original_size = ConfigManager().get_font_size()
+        mock_dialog.return_value.exec.return_value = 0
+
+        window.show_font_size_dialog()
+
+        assert ConfigManager().get_font_size() == original_size
+        fake_widget(window).apply_font_size.assert_not_called()
+
+    def test_column_widths_are_saved_on_close(self, app, backup_config, db_connect):
+        """終了時に列幅を保存し、次回はその列幅を担当一覧に渡す"""
+        window = MainWindow()
+        window.close()
+
+        assert ConfigManager().get_column_widths() == [90, 70, 110, 300, 100, 90, 90, 100, 200]
+
+        reopened = MainWindow()
+        fake_widget(reopened).set_column_widths.assert_called_once_with([90, 70, 110, 300, 100, 90, 90, 100, 200])
 
     def test_window_geometry_is_saved_on_close(self, app, backup_config, db_connect):
         """終了時の位置と大きさを保存し、次回はその位置と大きさで開く"""

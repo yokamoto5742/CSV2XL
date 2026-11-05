@@ -11,7 +11,7 @@ from services.validators import parse_date
 COLUMNS = [
     ("預り日", "received_date"),
     ("患者ID", "patient_id"),
-    ("患者名", "patient_name"),
+    ("患者氏名", "patient_name"),
     ("文書名", "document_name"),
     ("診療科", "department"),
     ("医師名", "doctor_name"),
@@ -24,6 +24,8 @@ REQUESTED_DATE_COLUMN = 7
 NOTE_COLUMN = 8
 EDITABLE_COLUMNS = {STAFF_COLUMN, REQUESTED_DATE_COLUMN, NOTE_COLUMN}
 DATE_COLUMNS = {0, REQUESTED_DATE_COLUMN}
+# 文字を入力して部分一致で絞り込める列(患者氏名・文書名・医師名・担当者名・備考)
+TEXT_FILTER_COLUMNS = {2, 3, 5, STAFF_COLUMN, NOTE_COLUMN}
 LEFT_ALIGNED_COLUMNS = {2, 3, NOTE_COLUMN}
 DATE_ERROR_MESSAGE = "医師依頼日は YYYY/MM/DD の形式で入力してください。\n(例: 2025/01/05)"
 
@@ -55,9 +57,38 @@ def format_cell(document: Document, column: int) -> str:
     return str(value)
 
 
-def matches_filters(document: Document, filters: dict[int, set[str]]) -> bool:
-    """すべての列で、表示する値に含まれているか"""
-    return all(format_cell(document, column) in values for column, values in filters.items())
+@dataclasses.dataclass(frozen=True)
+class ColumnFilter:
+    """列のフィルタの条件。指定した条件をすべて満たす行を表示する"""
+    # 表示する値(表示形式の文字列)。None ならチェックボックスでは絞らない
+    values: frozenset[str] | None = None
+    # 部分一致で絞り込む文字。空なら絞らない
+    text: str = ''
+    # 日付の範囲(YYYY-MM-DD)。None ならその側は絞らない
+    date_from: str | None = None
+    date_to: str | None = None
+
+    def is_empty(self) -> bool:
+        return self == ColumnFilter()
+
+    def matches(self, document: Document, column: int) -> bool:
+        cell = format_cell(document, column)
+        if self.values is not None and cell not in self.values:
+            return False
+        if self.text and self.text not in cell:
+            return False
+        if self.date_from is None and self.date_to is None:
+            return True
+        # 日付の範囲を指定したときは、空欄の行は表示しない
+        date = getattr(document, COLUMNS[column][1])
+        if not date:
+            return False
+        return (self.date_from is None or date >= self.date_from) and (self.date_to is None or date <= self.date_to)
+
+
+def matches_filters(document: Document, filters: dict[int, ColumnFilter]) -> bool:
+    """すべての列のフィルタの条件を満たすか"""
+    return all(column_filter.matches(document, column) for column, column_filter in filters.items())
 
 
 class DocumentTableModel(QAbstractTableModel):
@@ -72,8 +103,10 @@ class DocumentTableModel(QAbstractTableModel):
         # all_documents は全行、documents はフィルタで残った表示中の行(どちらも現在の並び順)
         self.all_documents: list[Document] = []
         self.documents: list[Document] = []
-        # 列ごとの表示する値(表示形式の文字列)。フィルタの無い列は含めない
-        self.filters: dict[int, set[str]] = {}
+        # 列ごとのフィルタの条件。フィルタの無い列は含めない
+        self.filters: dict[int, ColumnFilter] = {}
+        # 患者ID検索で絞り込んでいる患者ID
+        self.patient_id_filter: int | None = None
         self.sort_column = -1
         self.sort_descending = False
 
@@ -86,32 +119,42 @@ class DocumentTableModel(QAbstractTableModel):
         self.endResetModel()
 
     def filtered_documents(self) -> list[Document]:
-        return [doc for doc in self.all_documents if matches_filters(doc, self.filters)]
+        return [doc for doc in self.all_documents if self.is_visible(doc, self.filters)]
 
-    def set_filter(self, column: int, values: set[str] | None) -> None:
-        """列のフィルタを変える。values が None ならその列のフィルタを外す"""
-        if values is None:
-            self.filters.pop(column, None)
-        else:
-            self.filters[column] = values
+    def is_visible(self, document: Document, filters: dict[int, ColumnFilter]) -> bool:
+        if self.patient_id_filter is not None and document.patient_id != self.patient_id_filter:
+            return False
+        return matches_filters(document, filters)
+
+    def apply_filters(self) -> None:
         self.beginResetModel()
         self.documents = self.filtered_documents()
         self.endResetModel()
+
+    def set_filter(self, column: int, column_filter: ColumnFilter | None) -> None:
+        """列のフィルタを変える。None か条件が空ならその列のフィルタを外す"""
+        if column_filter is None or column_filter.is_empty():
+            self.filters.pop(column, None)
+        else:
+            self.filters[column] = column_filter
+        self.apply_filters()
         self.headerDataChanged.emit(Qt.Orientation.Horizontal, column, column)
+
+    def set_patient_id_filter(self, patient_id: int | None) -> None:
+        """患者ID検索の絞り込みを変える。None なら外す"""
+        self.patient_id_filter = patient_id
+        self.apply_filters()
 
     def column_values(self, column: int) -> list[str]:
         """フィルタで選べる値。ほかの列のフィルタで残る行の値を、並べ替えと同じく空欄を末尾にして返す"""
-        other_filters = {col: values for col, values in self.filters.items() if col != column}
+        other_filters = {col: condition for col, condition in self.filters.items() if col != column}
         field = COLUMNS[column][1]
         raw_values = {format_cell(doc, column): getattr(doc, field)
-                      for doc in self.all_documents if matches_filters(doc, other_filters)}
+                      for doc in self.all_documents if self.is_visible(doc, other_filters)}
         return sorted(raw_values, key=lambda text: (raw_values[text] in (None, ''), raw_values[text] or ''))
 
     def document(self, row: int) -> Document:
         return self.documents[row]
-
-    def find_rows(self, patient_id: int) -> list[int]:
-        return [row for row, doc in enumerate(self.documents) if doc.patient_id == patient_id]
 
     def find_row_by_id(self, document_id: int) -> int | None:
         return next((row for row, doc in enumerate(self.documents) if doc.id == document_id), None)

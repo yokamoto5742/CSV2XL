@@ -64,6 +64,16 @@ class TestConfigManager:
         assert reloaded.get_start_maximized() is False
         assert reloaded.get_side_panel_width() == 320
 
+    def test_font_size_and_column_widths(self, config: ConfigManager) -> None:
+        assert config.get_column_widths() == []
+
+        config.set_font_size(14)
+        config.set_column_widths([100, 80, 120])
+
+        reloaded = ConfigManager(config.config_file)
+        assert reloaded.get_font_size() == 14
+        assert reloaded.get_column_widths() == [100, 80, 120]
+
 
 class TestGetConfigPath:
     def test_not_frozen(self, monkeypatch: pytest.MonkeyPatch) -> None:

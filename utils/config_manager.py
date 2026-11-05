@@ -94,6 +94,16 @@ class ConfigManager:
     def get_font_size(self) -> int:
         return self.config.getint('Appearance', 'font_size', fallback=9)
 
+    def set_font_size(self, size: int) -> None:
+        self._set('Appearance', {'font_size': str(size)})
+
+    def get_column_widths(self) -> list[int]:
+        """担当一覧の列幅(ピクセル)。保存されていなければ空のリスト"""
+        return [int(width) for width in split_comma_list(self.config.get('Appearance', 'column_widths', fallback=''))]
+
+    def set_column_widths(self, widths: list[int]) -> None:
+        self._set('Appearance', {'column_widths': ','.join(str(width) for width in widths)})
+
     def get_window_size(self) -> tuple[int, int]:
         width = self.config.getint('Appearance', 'window_width', fallback=300)
         height = self.config.getint('Appearance', 'window_height', fallback=200)

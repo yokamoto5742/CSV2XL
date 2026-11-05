@@ -10,8 +10,10 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateEdit, QMessageBox, QStyleOptionViewItem
 )
 
-from app.document_table_model import REQUESTED_DATE_COLUMN, STAFF_COLUMN
-from app.document_window import ROW_PADDING, DocumentListWidget, RequestedDateDelegate, StaffComboDelegate
+from app.document_table_model import REQUESTED_DATE_COLUMN, STAFF_COLUMN, ColumnFilter
+from app.document_window import (
+    COLUMN_WIDTHS, CORNER_LABEL_PADDING, ROW_PADDING, DocumentListWidget, RequestedDateDelegate, StaffComboDelegate
+)
 from services.database import connect
 from services.document_repository import DocumentRepository
 from services.list_repository import STAFF, ListRepository
@@ -54,29 +56,43 @@ def statuses(window: DocumentListWidget) -> list[str]:
     return received
 
 
+def visible_patient_ids(window: DocumentListWidget) -> list[int]:
+    return [window.model.document(row).patient_id for row in range(window.model.rowCount())]
+
+
 class TestSearch:
-    def test_search_and_cycle(self, window: DocumentListWidget, statuses: list[str]):
-        """見つかった行を選び、次へ・前へで順に移る(端まで行ったら先頭に戻る)"""
+    def test_search_shows_only_matching_rows(self, window: DocumentListWidget, statuses: list[str]):
         window.search('100')
+
+        assert visible_patient_ids(window) == [100, 100]
         assert selected_row(window) == 0
-        assert statuses[-1] == "1/2件"
+        assert statuses[-1] == "患者ID 100: 2件"
 
-        window.show_next_hit()
-        assert selected_row(window) == 2
-        assert statuses[-1] == "2/2件"
+    def test_clear_search(self, window: DocumentListWidget, statuses: list[str]):
+        window.search('100')
 
-        window.show_next_hit()
-        assert statuses[-1] == "1/2件"
+        window.clear_search()
 
-        window.show_previous_hit()
-        assert statuses[-1] == "2/2件"
+        assert visible_patient_ids(window) == [100, 200, 100]
+        assert statuses[-1] == ""
+
+    def test_empty_text_clears_search(self, window: DocumentListWidget, statuses: list[str]):
+        window.search('100')
+
+        window.search(' ')
+
+        assert window.model.rowCount() == 3
+        assert statuses[-1] == ""
 
     @patch('app.document_window.QMessageBox.information')
-    def test_not_found(self, mock_info, window: DocumentListWidget, statuses: list[str]):
+    def test_not_found_keeps_previous_search(self, mock_info, window: DocumentListWidget, statuses: list[str]):
+        window.search('200')
+
         window.search('999')
 
         assert mock_info.call_args[0][2] == "該当する患者IDは見つかりませんでした。"
-        assert statuses[-1] == ""
+        assert visible_patient_ids(window) == [200]
+        assert statuses[-1] == "患者ID 200: 1件"
 
     @patch('app.document_window.QMessageBox.warning')
     def test_not_a_number(self, mock_warning, window: DocumentListWidget):
@@ -84,13 +100,14 @@ class TestSearch:
 
         assert mock_warning.call_args[0][2] == "数値を入力してください。"
 
-    def test_sort_clears_search(self, window: DocumentListWidget, statuses: list[str]):
+    def test_search_kept_after_sort_and_reload(self, window: DocumentListWidget, statuses: list[str]):
         window.search('100')
 
         window.model.sort(1)
+        window.reload()
 
-        assert window.search_hits == []
-        assert statuses[-1] == ""
+        assert visible_patient_ids(window) == [100, 100]
+        assert statuses[-1] == "患者ID 100: 2件"
 
 
 class TestRefresh:
@@ -266,7 +283,7 @@ class TestExportCsv:
         window.export_csv(str(path))
 
         lines = path.read_text(encoding='utf-8-sig').splitlines()
-        assert lines[0] == '預り日,患者ID,患者名,文書名,診療科,医師名,担当者名,医師依頼日,備考'
+        assert lines[0] == '預り日,患者ID,患者氏名,文書名,診療科,医師名,担当者名,医師依頼日,備考'
         assert [line.split(',')[0] for line in lines[1:]] == ['2025/01/10', '2025/01/11', '2025/01/12']
 
 
@@ -310,7 +327,7 @@ class TestColumnFilter:
     @patch('app.document_window.ColumnFilterDialog')
     def test_header_right_click_filters(self, mock_dialog, window: DocumentListWidget):
         mock_dialog.return_value.exec.return_value = 1
-        mock_dialog.return_value.selected_values.return_value = {'100'}
+        mock_dialog.return_value.column_filter.return_value = ColumnFilter(values=frozenset({'100'}))
         header = window.table.horizontalHeader()
         assert header is not None
         window.resize(1200, 400)
@@ -318,9 +335,9 @@ class TestColumnFilter:
 
         window.show_column_filter(position)
 
-        assert mock_dialog.call_args[0][:3] == ('患者ID', ['100', '200'], None)
+        assert mock_dialog.call_args[0][:3] == (1, ['100', '200'], None)
         assert window.model.rowCount() == 2
-        assert window.model.filters == {1: {'100'}}
+        assert window.model.filters == {1: ColumnFilter(values=frozenset({'100'}))}
 
     @patch('app.document_window.ColumnFilterDialog')
     def test_cancel_keeps_filter(self, mock_dialog, window: DocumentListWidget):
@@ -331,14 +348,14 @@ class TestColumnFilter:
         assert window.model.rowCount() == 3
 
     def test_search_only_visible_rows(self, window: DocumentListWidget, statuses: list[str]):
-        window.model.set_filter(0, {'2025/01/12'})
+        window.model.set_filter(0, ColumnFilter(values=frozenset({'2025/01/12'})))
 
         window.search('100')
 
-        assert statuses[-1] == "1/1件"
+        assert statuses[-1] == "患者ID 100: 1件"
 
     def test_export_only_visible_rows(self, window: DocumentListWidget, tmp_path: Path):
-        window.model.set_filter(1, {'200'})
+        window.model.set_filter(1, ColumnFilter(values=frozenset({'200'})))
         path = tmp_path / 'export.csv'
 
         window.export_csv(str(path))
@@ -347,7 +364,7 @@ class TestColumnFilter:
 
     def test_add_document_while_hidden_by_filter(self, window: DocumentListWidget):
         """追加した行がフィルタで隠れても、エラーにならない"""
-        window.model.set_filter(1, {'100'})
+        window.model.set_filter(1, ColumnFilter(values=frozenset({'100'})))
 
         window.add_document(make_new_document(999, '2025-01-01'))
 
@@ -362,3 +379,18 @@ def test_apply_font_size_sets_row_height(window: DocumentListWidget):
     window.apply_font_size()
 
     assert header.defaultSectionSize() == window.table.fontMetrics().height() + ROW_PADDING
+    assert header.minimumWidth() == window.table.fontMetrics().horizontalAdvance("番号") + CORNER_LABEL_PADDING
+
+
+class TestColumnWidths:
+    def test_set_and_get(self, window: DocumentListWidget):
+        widths = [90, 70, 110, 300, 100, 90, 90, 100, 200]
+
+        window.set_column_widths(widths)
+
+        assert window.column_widths()[:-1] == widths[:-1]
+
+    def test_wrong_count_keeps_default(self, window: DocumentListWidget):
+        window.set_column_widths([50, 50])
+
+        assert window.column_widths()[:-1] == COLUMN_WIDTHS[:-1]

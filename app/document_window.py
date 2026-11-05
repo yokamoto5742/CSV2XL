@@ -1,10 +1,12 @@
 import sqlite3
 
-from PyQt6.QtCore import QAbstractItemModel, QDate, QModelIndex, QPersistentModelIndex, QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import (
+    QAbstractItemModel, QDate, QEvent, QModelIndex, QObject, QPersistentModelIndex, QPoint, Qt, QTimer, pyqtSignal
+)
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QApplication, QComboBox, QDateEdit, QMenu, QMessageBox, QStyledItemDelegate,
-    QStyleOptionViewItem, QTableView, QVBoxLayout, QWidget
+    QAbstractButton, QAbstractItemView, QApplication, QComboBox, QDateEdit, QMenu, QMessageBox, QStyle,
+    QStyledItemDelegate, QStyleOptionHeader, QStyleOptionViewItem, QStylePainter, QTableView, QVBoxLayout, QWidget
 )
 
 from app.dialogs import DISPLAY_DATE_FORMAT, ColumnFilterDialog, DocumentDetailDialog, create_date_edit
@@ -19,6 +21,9 @@ COLUMN_WIDTHS = [100, 80, 120, 320, 120, 100, 100, 110, 260]
 AUTO_REFRESH_INTERVAL_MS = 5000
 # 行の高さ = 文字の高さ + 上下の余白(ピクセル)
 ROW_PADDING = 8
+# 行番号の見出し(表の左上の角に表示する)と、その左右の余白(ピクセル)
+CORNER_LABEL = "番号"
+CORNER_LABEL_PADDING = 12
 
 
 class CommitOnSelectDelegate(QStyledItemDelegate):
@@ -88,10 +93,25 @@ class RequestedDateDelegate(CommitOnSelectDelegate):
                           editor.date().toString(DISPLAY_DATE_FORMAT), Qt.ItemDataRole.EditRole)
 
 
+class CornerLabelPainter(QObject):
+    """表の左上の角(行番号の上)に見出しの文字を描く。Qt の角のボタンは文字を描かないため"""
+
+    def eventFilter(self, watched: QObject | None, event: QEvent | None) -> bool:
+        if isinstance(watched, QAbstractButton) and event is not None and event.type() == QEvent.Type.Paint:
+            option = QStyleOptionHeader()
+            option.initFrom(watched)
+            option.text = CORNER_LABEL
+            option.textAlignment = Qt.AlignmentFlag.AlignCenter
+            option.position = QStyleOptionHeader.SectionPosition.OnlyOneSection
+            QStylePainter(watched).drawControl(QStyle.ControlElement.CE_Header, option)
+            return True
+        return super().eventFilter(watched, event)
+
+
 class DocumentListWidget(QWidget):
     """医療文書担当一覧の表示・編集・患者ID検索"""
 
-    # 検索結果の位置(例: "1/3件")。検索結果が無いときは空文字
+    # 患者ID検索の結果(例: "患者ID 100: 3件")。絞り込んでいないときは空文字
     search_status_changed = pyqtSignal(str)
 
     def __init__(self, connection: sqlite3.Connection, parent: QWidget | None = None) -> None:
@@ -100,8 +120,6 @@ class DocumentListWidget(QWidget):
         self.repository = DocumentRepository(connection)
         self.model = DocumentTableModel(self.repository)
         self.staff_names: list[str] = []
-        self.search_hits: list[int] = []
-        self.search_position = 0
         self.last_data_version = -1
 
         layout = QVBoxLayout(self)
@@ -113,8 +131,8 @@ class DocumentListWidget(QWidget):
         # セルの確定処理の途中で表を読み直さないよう、確定が終わってから処理する
         self.model.error_occurred.connect(lambda message: QTimer.singleShot(0, lambda: self.show_error(message)))
         self.model.conflict_detected.connect(lambda: QTimer.singleShot(0, self.handle_conflict))
-        self.model.modelReset.connect(self.clear_search)
-        self.model.layoutChanged.connect(self.clear_search)
+        # 読み直しやフィルタの変更で件数が変わるため、そのたびに表示し直す
+        self.model.modelReset.connect(self.update_search_status)
 
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.refresh_if_changed)
@@ -149,7 +167,20 @@ class DocumentListWidget(QWidget):
         table.setSortingEnabled(True)
         for column, width in enumerate(COLUMN_WIDTHS):
             table.setColumnWidth(column, width)
+        corner_button = table.findChild(QAbstractButton)
+        if corner_button is not None:
+            corner_button.installEventFilter(CornerLabelPainter(table))
         return table
+
+    def column_widths(self) -> list[int]:
+        return [self.table.columnWidth(column) for column in range(len(COLUMNS))]
+
+    def set_column_widths(self, widths: list[int]) -> None:
+        """保存した列幅にする。列の数が合わなければ(列を増減した後など)既定の幅のままにする"""
+        if len(widths) != len(COLUMNS):
+            return
+        for column, width in enumerate(widths):
+            self.table.setColumnWidth(column, width)
 
     def reload(self) -> None:
         """DB から読み直す(スクロール位置は保つ)"""
@@ -183,40 +214,30 @@ class DocumentListWidget(QWidget):
             self.reload()
 
     def search(self, text: str) -> None:
+        """その患者IDの行だけを表示する(列のフィルタも併せて効く)。空欄なら絞り込みを外す"""
+        if not text.strip():
+            self.clear_search()
+            return
         patient_id = parse_patient_id(text)
         if patient_id is None:
             QMessageBox.warning(self, "患者ID検索", "数値を入力してください。")
             return
-        hits = self.model.find_rows(patient_id)
-        if not hits:
-            self.clear_search()
+        previous = self.model.patient_id_filter
+        self.model.set_patient_id_filter(patient_id)
+        if self.model.rowCount() == 0:
+            self.model.set_patient_id_filter(previous)
             QMessageBox.information(self, "患者ID検索", "該当する患者IDは見つかりませんでした。")
             return
-        self.search_hits = hits
-        self.search_position = 0
-        self.show_current_hit()
-
-    def show_next_hit(self) -> None:
-        if self.search_hits:
-            self.search_position = (self.search_position + 1) % len(self.search_hits)
-            self.show_current_hit()
-
-    def show_previous_hit(self) -> None:
-        if self.search_hits:
-            self.search_position = (self.search_position - 1) % len(self.search_hits)
-            self.show_current_hit()
-
-    def show_current_hit(self) -> None:
-        row = self.search_hits[self.search_position]
-        self.table.selectRow(row)
-        self.table.scrollTo(self.model.index(row, 0), QAbstractItemView.ScrollHint.PositionAtCenter)
-        self.search_status_changed.emit(f"{self.search_position + 1}/{len(self.search_hits)}件")
+        self.table.selectRow(0)
+        self.table.scrollToTop()
 
     def clear_search(self) -> None:
-        # 並び替えや読み直しで行の位置が変わるため、検索結果を捨てる
-        self.search_hits = []
-        self.search_position = 0
-        self.search_status_changed.emit("")
+        self.model.set_patient_id_filter(None)
+
+    def update_search_status(self) -> None:
+        patient_id = self.model.patient_id_filter
+        status = "" if patient_id is None else f"患者ID {patient_id}: {self.model.rowCount()}件"
+        self.search_status_changed.emit(status)
 
     def clear_requested_date(self) -> None:
         index = self.table.currentIndex()
@@ -224,10 +245,12 @@ class DocumentListWidget(QWidget):
             self.model.setData(index, '')
 
     def apply_font_size(self) -> None:
-        """フォントを変えたときに行の高さを合わせる"""
+        """フォントを変えたときに行の高さと行番号の幅(角の「番号」が収まる幅)を合わせる"""
         header = self.table.verticalHeader()
         if header is not None:
-            header.setDefaultSectionSize(self.table.fontMetrics().height() + ROW_PADDING)
+            metrics = self.table.fontMetrics()
+            header.setDefaultSectionSize(metrics.height() + ROW_PADDING)
+            header.setMinimumWidth(metrics.horizontalAdvance(CORNER_LABEL) + CORNER_LABEL_PADDING)
 
     def add_document(self, document: NewDocument) -> None:
         """手動で追加し、追加した行を選ぶ"""
@@ -295,18 +318,17 @@ class DocumentListWidget(QWidget):
             clipboard.setText(str(index.data() or ''))
 
     def show_column_filter(self, position: QPoint) -> None:
-        """見出しを右クリックした列の値を選んで絞り込む"""
+        """見出しを右クリックした列のフィルタの条件を選んで絞り込む"""
         header = self.table.horizontalHeader()
         if header is None:
             return
         column = header.logicalIndexAt(position)
         if column < 0:
             return
-        dialog = ColumnFilterDialog(COLUMNS[column][0], self.model.column_values(column),
-                                    self.model.filters.get(column), self)
+        dialog = ColumnFilterDialog(column, self.model.column_values(column), self.model.filters.get(column), self)
         dialog.move(header.mapToGlobal(position))
         if dialog.exec():
-            self.model.set_filter(column, dialog.selected_values())
+            self.model.set_filter(column, dialog.column_filter())
 
     def export_csv(self, path: str) -> None:
         """表示中の行を画面の並び順のまま CSV に書き出す。失敗時は OSError"""

@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
 from app.document_table_model import (
-    NOTE_COLUMN, REQUESTED_DATE_COLUMN, STAFF_COLUMN, DocumentTableModel, sort_documents
+    NOTE_COLUMN, REQUESTED_DATE_COLUMN, STAFF_COLUMN, ColumnFilter, DocumentTableModel, sort_documents
 )
 from services.document_repository import Document, DocumentRepository
 from tests.conftest import make_new_document
@@ -80,7 +80,7 @@ class TestDocumentTableModel:
 
     def test_header(self, model: DocumentTableModel):
         headers = [model.headerData(col, Qt.Orientation.Horizontal) for col in range(model.columnCount())]
-        assert headers == ["預り日", "患者ID", "患者名", "文書名", "診療科", "医師名", "担当者名", "医師依頼日", "備考"]
+        assert headers == ["預り日", "患者ID", "患者氏名", "文書名", "診療科", "医師名", "担当者名", "医師依頼日", "備考"]
 
     def test_set_data_saves_to_database(self, model: DocumentTableModel):
         assert model.setData(model.index(0, STAFF_COLUMN), '山本')
@@ -134,10 +134,6 @@ class TestDocumentTableModel:
         model.load()
         assert [model.document(row).patient_id for row in range(3)] == [300, 200, 100]
 
-    def test_find_rows(self, model: DocumentTableModel):
-        assert model.find_rows(200) == [1]
-        assert model.find_rows(999) == []
-
     def test_find_row_by_id(self, model: DocumentTableModel):
         assert model.find_row_by_id(model.document(2).id) == 2
         assert model.find_row_by_id(999) is None
@@ -166,9 +162,13 @@ def patient_ids(model: DocumentTableModel) -> list[int]:
     return [model.document(row).patient_id for row in range(model.rowCount())]
 
 
+def value_filter(*values: str) -> ColumnFilter:
+    return ColumnFilter(values=frozenset(values))
+
+
 class TestFilter:
     def test_filter_and_clear(self, model: DocumentTableModel):
-        model.set_filter(4, {'内科'})
+        model.set_filter(4, value_filter('内科'))
         assert patient_ids(model) == [100, 300]
         assert model.headerData(4, Qt.Orientation.Horizontal) == "診療科 ▼"
 
@@ -176,21 +176,77 @@ class TestFilter:
         assert patient_ids(model) == [100, 200, 300]
         assert model.headerData(4, Qt.Orientation.Horizontal) == "診療科"
 
+    def test_empty_condition_clears_filter(self, model: DocumentTableModel):
+        model.set_filter(4, value_filter('内科'))
+
+        model.set_filter(4, ColumnFilter())
+
+        assert model.filters == {}
+        assert patient_ids(model) == [100, 200, 300]
+
     def test_filters_on_several_columns(self, model: DocumentTableModel):
-        model.set_filter(4, {'内科'})
-        model.set_filter(0, {'2025/01/11'})
+        model.set_filter(4, value_filter('内科'))
+        model.set_filter(0, value_filter('2025/01/11'))
 
         assert patient_ids(model) == [300]
 
     def test_empty_value(self, model: DocumentTableModel):
         model.setData(model.index(0, STAFF_COLUMN), '山本')
 
-        model.set_filter(STAFF_COLUMN, {''})
+        model.set_filter(STAFF_COLUMN, value_filter(''))
 
         assert patient_ids(model) == [200, 300]
 
+    def test_text_filter_matches_part(self, model: DocumentTableModel):
+        model.setData(model.index(0, NOTE_COLUMN), '至急で対応')
+        model.setData(model.index(1, NOTE_COLUMN), '至急')
+
+        model.set_filter(NOTE_COLUMN, ColumnFilter(text='至急'))
+        assert patient_ids(model) == [100, 200]
+
+        # チェックボックスの条件とは両方を満たす行だけ表示する
+        model.set_filter(NOTE_COLUMN, ColumnFilter(values=frozenset({'至急'}), text='至急'))
+        assert patient_ids(model) == [200]
+
+    def test_date_range(self, model: DocumentTableModel):
+        model.set_filter(0, ColumnFilter(date_from='2025-01-11'))
+        assert patient_ids(model) == [300]
+
+        model.set_filter(0, ColumnFilter(date_to='2025-01-10'))
+        assert patient_ids(model) == [100, 200]
+
+        model.set_filter(0, ColumnFilter(date_from='2025-01-10', date_to='2025-01-10'))
+        assert patient_ids(model) == [100, 200]
+
+    def test_date_range_hides_empty_dates(self, model: DocumentTableModel):
+        model.setData(model.index(0, REQUESTED_DATE_COLUMN), '2025/01/15')
+
+        model.set_filter(REQUESTED_DATE_COLUMN, ColumnFilter(date_from='2025-01-01'))
+
+        assert patient_ids(model) == [100]
+
+    def test_patient_id_filter(self, model: DocumentTableModel):
+        model.set_patient_id_filter(200)
+        assert patient_ids(model) == [200]
+
+        # 列のフィルタとは両方を満たす行だけ表示する
+        model.set_filter(4, value_filter('内科'))
+        assert patient_ids(model) == []
+        # 選べる値も絞り込んだ患者の行の値だけにする
+        assert model.column_values(4) == ['眼科']
+
+        model.set_patient_id_filter(None)
+        assert patient_ids(model) == [100, 300]
+
+    def test_patient_id_filter_kept_after_load(self, model: DocumentTableModel):
+        model.set_patient_id_filter(100)
+
+        model.load()
+
+        assert patient_ids(model) == [100]
+
     def test_filter_kept_after_sort_and_load(self, model: DocumentTableModel):
-        model.set_filter(4, {'内科'})
+        model.set_filter(4, value_filter('内科'))
 
         model.sort(1, Qt.SortOrder.DescendingOrder)
         assert patient_ids(model) == [300, 100]
@@ -205,7 +261,7 @@ class TestFilter:
         assert model.column_values(1) == ['100', '200', '300']
         assert model.column_values(STAFF_COLUMN) == ['山本', '']
 
-        model.set_filter(4, {'眼科'})
+        model.set_filter(4, value_filter('眼科'))
         assert model.column_values(1) == ['200']
         # 自分の列のフィルタでは絞らない
         assert model.column_values(4) == ['内科', '眼科']
@@ -218,15 +274,14 @@ class TestFilter:
 
         assert table_model.column_values(1) == ['20', '100']
 
-    def test_find_and_export_use_visible_rows(self, model: DocumentTableModel):
-        model.set_filter(4, {'内科'})
+    def test_export_uses_visible_rows(self, model: DocumentTableModel):
+        model.set_filter(4, value_filter('内科'))
 
-        assert model.find_rows(200) == []
         assert [row[1] for row in model.export_rows()] == ['100', '300']
 
     def test_saved_row_stays_until_reload(self, model: DocumentTableModel):
         """保存した値がフィルタに合わなくなっても、読み直すまで行を残す"""
-        model.set_filter(STAFF_COLUMN, {''})
+        model.set_filter(STAFF_COLUMN, value_filter(''))
 
         assert model.setData(model.index(0, STAFF_COLUMN), '山本')
         assert model.rowCount() == 3

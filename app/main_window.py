@@ -11,7 +11,8 @@ from PyQt6.QtWidgets import (
 )
 
 from app.dialogs import (
-    AddDocumentDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, StaffNamesDialog, FolderPathDialog, SettingsDialog
+    AddDocumentDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, StaffNamesDialog, FolderPathDialog, FontSizeDialog,
+    SettingsDialog
 )
 from app.document_window import DocumentListWidget
 from utils.config_manager import ConfigManager
@@ -95,6 +96,7 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(side_panel)
         self.setCentralWidget(self.splitter)
         self.side_panel_width = self.config.get_side_panel_width()
+        self.column_widths = self.config.get_column_widths()
 
         self.open_document_list()
         self.backup_daily()
@@ -118,7 +120,6 @@ class MainWindow(QMainWindow):
         add_button(panel, "医師名", self.show_exclude_doctors_dialog)
         panel.addSpacing(SECTION_SPACING)
 
-        add_button(panel, "担当者名", self.show_staff_names_dialog)
         add_button(panel, "設定", self.show_settings_dialog)
         panel.addSpacing(SECTION_SPACING)
 
@@ -136,10 +137,7 @@ class MainWindow(QMainWindow):
         add_button(search_input, "検索", self.search)
         panel.addLayout(search_input)
 
-        search_buttons = QHBoxLayout()
-        add_button(search_buttons, "前へ", self.show_previous_hit)
-        add_button(search_buttons, "次へ", self.show_next_hit)
-        panel.addLayout(search_buttons)
+        add_button(panel, "解除", self.clear_search)
 
         self.search_result_label = QLabel("")
         panel.addWidget(self.search_result_label)
@@ -161,6 +159,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "エラー", f"担当一覧を開けませんでした:\n{str(e)}")
             return
         document_widget.search_status_changed.connect(self.search_result_label.setText)
+        document_widget.set_column_widths(self.column_widths)
         self.splitter.addWidget(document_widget)
         self.splitter.setStretchFactor(1, 1)
         # 一覧側は残りの幅いっぱいに広がるので、大きめの値を渡しておく
@@ -170,6 +169,7 @@ class MainWindow(QMainWindow):
     def close_connection(self) -> None:
         if self.document_widget is not None:
             self.side_panel_width = self.splitter.sizes()[0]
+            self.column_widths = self.document_widget.column_widths()
             self.document_widget.refresh_timer.stop()
             self.document_widget.setParent(None)
             self.document_widget.deleteLater()
@@ -183,13 +183,10 @@ class MainWindow(QMainWindow):
         if self.document_widget is not None:
             self.document_widget.search(self.patient_id_input.text())
 
-    def show_next_hit(self) -> None:
+    def clear_search(self) -> None:
+        self.patient_id_input.clear()
         if self.document_widget is not None:
-            self.document_widget.show_next_hit()
-
-    def show_previous_hit(self) -> None:
-        if self.document_widget is not None:
-            self.document_widget.show_previous_hit()
+            self.document_widget.clear_search()
 
     def import_csv(self) -> None:
         try:
@@ -274,8 +271,26 @@ class MainWindow(QMainWindow):
             ("xlsm取り込み", self.import_xlsm),
             ("CSV出力", self.export_csv),
             ("フォルダパス", self.show_folder_path_dialog),
+            ("フォントサイズ", self.show_font_size_dialog),
+            ("担当者名", self.show_staff_names_dialog),
         ], self)
         dialog.exec()
+
+    def show_font_size_dialog(self) -> None:
+        """入力したフォントサイズを保存し、すぐにアプリ全体に反映する"""
+        config = ConfigManager()
+        dialog = FontSizeDialog(config.get_font_size(), self)
+        if not dialog.exec():
+            return
+        font_size = dialog.font_size()
+        if font_size is None:
+            return
+        config.set_font_size(font_size)
+        apply_app_font_size(font_size)
+        # スタイルシートを設定したウィンドウの子にはアプリのフォントが届かないため、設定し直して反映させる
+        self.setStyleSheet(self.styleSheet())
+        if self.document_widget is not None:
+            self.document_widget.apply_font_size()
 
     def restore_window_geometry(self) -> None:
         """前回終了時の位置と大きさにする。その位置がどの画面にも入らなければ、大きさだけを戻す"""
@@ -302,5 +317,6 @@ class MainWindow(QMainWindow):
         # フォルダパスのダイアログが保存した値を古い内容で上書きしないよう、読み直してから保存する
         self.config = ConfigManager()
         self.config.set_side_panel_width(self.side_panel_width)
+        self.config.set_column_widths(self.column_widths)
         self.save_window_geometry()
         super().closeEvent(event)

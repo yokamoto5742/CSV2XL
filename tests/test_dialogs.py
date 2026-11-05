@@ -8,8 +8,9 @@ from PyQt6.QtWidgets import QApplication, QDialog, QListWidget, QPushButton
 
 from app.dialogs import (
     AddDocumentDialog, ColumnFilterDialog, DocumentDetailDialog, ExcludeDocsDialog, ExcludeDoctorsDialog,
-    FolderPathDialog, ListItemDialog, SettingsDialog, StaffNamesDialog
+    FolderPathDialog, FontSizeDialog, ListItemDialog, SettingsDialog, StaffNamesDialog
 )
+from app.document_table_model import NOTE_COLUMN, REQUESTED_DATE_COLUMN, STAFF_COLUMN, ColumnFilter
 from services.document_repository import Document, NewDocument
 from services.list_repository import EXCLUDE_DOCS, EXCLUDE_DOCTORS, STAFF, ListRepository
 from utils.config_manager import ConfigManager, CONFIG_PATH
@@ -388,21 +389,24 @@ def check(dialog: ColumnFilterDialog, row: int, checked: bool) -> None:
 
 class TestColumnFilterDialog:
     def test_all_checked_means_no_filter(self, app):
-        dialog = ColumnFilterDialog("担当者名", ['山本', ''], None)
+        dialog = ColumnFilterDialog(STAFF_COLUMN, ['山本', ''], None)
 
+        assert dialog.windowTitle() == "担当者名のフィルタ"
         assert get_item_text(dialog.value_list, 1) == "(空白)"
         assert dialog.select_all_input.isChecked()
         assert dialog.selected_values() is None
+        assert dialog.column_filter().is_empty()
 
     def test_selected_values(self, app):
-        dialog = ColumnFilterDialog("担当者名", ['山本', '植田', ''], {'山本'})
+        dialog = ColumnFilterDialog(STAFF_COLUMN, ['山本', '植田', ''], ColumnFilter(values=frozenset({'山本'})))
 
         assert dialog.selected_values() == {'山本'}
         check(dialog, 2, True)
         assert dialog.selected_values() == {'山本', ''}
+        assert dialog.column_filter() == ColumnFilter(values=frozenset({'山本', ''}))
 
     def test_select_all(self, app):
-        dialog = ColumnFilterDialog("担当者名", ['山本', '植田'], {'山本'})
+        dialog = ColumnFilterDialog(STAFF_COLUMN, ['山本', '植田'], ColumnFilter(values=frozenset({'山本'})))
 
         dialog.set_all_checked(True)
         assert dialog.selected_values() is None
@@ -412,11 +416,73 @@ class TestColumnFilterDialog:
 
     @patch('app.dialogs.QMessageBox.warning')
     def test_rejects_nothing_checked(self, mock_warning, app):
-        dialog = ColumnFilterDialog("担当者名", ['山本'], None)
+        dialog = ColumnFilterDialog(STAFF_COLUMN, ['山本'], None)
         check(dialog, 0, False)
 
         with patch.object(QDialog, 'accept') as mock_accept:
             dialog.accept()
 
+        mock_accept.assert_not_called()
+        mock_warning.assert_called_once()
+
+    def test_text_filter(self, app):
+        dialog = ColumnFilterDialog(NOTE_COLUMN, ['至急'], ColumnFilter(text='至'))
+
+        assert dialog.text_input is not None
+        assert dialog.text_input.text() == '至'
+        assert dialog.date_inputs is None
+        dialog.text_input.setText(' 急 ')
+        assert dialog.column_filter() == ColumnFilter(text='急')
+
+    def test_no_text_or_date_input_for_department(self, app):
+        dialog = ColumnFilterDialog(4, ['内科'], None)
+
+        assert dialog.text_input is None
+        assert dialog.date_inputs is None
+
+    def test_date_range(self, app):
+        dialog = ColumnFilterDialog(REQUESTED_DATE_COLUMN, ['2025/01/10', ''], ColumnFilter(date_from='2025-01-05'))
+        assert dialog.date_inputs is not None
+        (from_input, no_from_input), (to_input, no_to_input) = dialog.date_inputs
+
+        assert dialog.text_input is None
+        assert from_input.date() == QDate(2025, 1, 5)
+        assert not no_from_input.isChecked()
+        assert no_to_input.isChecked()
+        assert not to_input.isEnabled()
+
+        no_to_input.setChecked(False)
+        to_input.setDate(QDate(2025, 1, 31))
+        assert dialog.column_filter() == ColumnFilter(date_from='2025-01-05', date_to='2025-01-31')
+
+    @patch('app.dialogs.QMessageBox.warning')
+    def test_rejects_reversed_date_range(self, mock_warning, app):
+        dialog = ColumnFilterDialog(0, ['2025/01/10'], ColumnFilter(date_from='2025-02-01', date_to='2025-01-01'))
+
+        with patch.object(QDialog, 'accept') as mock_accept:
+            dialog.accept()
+
+        mock_accept.assert_not_called()
+        assert mock_warning.call_args[0][2] == "開始日は終了日以前の日付にしてください。"
+
+
+class TestFontSizeDialog:
+    def test_font_size(self, app):
+        dialog = FontSizeDialog(12)
+
+        assert dialog.font_size_input.text() == '12'
+        dialog.font_size_input.setText(' 14 ')
+        assert dialog.font_size() == 14
+
+    @pytest.mark.parametrize("text", ['', 'abc', '5', '25', '1.5'])
+    @patch('app.dialogs.QMessageBox.warning')
+    def test_rejects_invalid_size(self, mock_warning, app, text):
+        dialog = FontSizeDialog(12)
+        dialog.font_size_input.setText(text)
+
+        with patch.object(QDialog, 'accept') as mock_accept:
+            dialog.accept()
+
+        assert dialog.font_size() is None
         mock_accept.assert_not_called()
         mock_warning.assert_called_once()

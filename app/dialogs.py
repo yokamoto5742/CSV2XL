@@ -10,7 +10,9 @@ from PyQt6.QtWidgets import (
     QMessageBox, QCheckBox, QComboBox, QDateEdit, QFormLayout, QWidget
 )
 
-from app.document_table_model import COLUMNS, NOTE_COLUMN, format_cell
+from app.document_table_model import (
+    COLUMNS, DATE_COLUMNS, NOTE_COLUMN, TEXT_FILTER_COLUMNS, ColumnFilter, format_cell
+)
 from services.document_repository import Document, NewDocument
 from services.list_repository import EXCLUDE_DOCS, EXCLUDE_DOCTORS, STAFF, ListRepository
 from services.validators import parse_patient_id
@@ -19,6 +21,8 @@ from utils.config_manager import ConfigManager
 DISPLAY_DATE_FORMAT = 'yyyy/MM/dd'
 EMPTY_VALUE_LABEL = "(空白)"
 DETAIL_DIALOG_MIN_WIDTH = 480
+MIN_FONT_SIZE = 6
+MAX_FONT_SIZE = 24
 
 
 def create_date_edit(parent: QWidget | None = None) -> QDateEdit:
@@ -162,7 +166,7 @@ class AddDocumentDialog(QDialog):
         self.patient_id_input = QLineEdit()
         layout.addRow("患者ID:", self.patient_id_input)
         self.text_inputs: dict[str, QLineEdit] = {}
-        for field, label in (("patient_name", "患者名"), ("document_name", "文書名"),
+        for field, label in (("patient_name", "患者氏名"), ("document_name", "文書名"),
                              ("department", "診療科"), ("doctor_name", "医師名")):
             self.text_inputs[field] = QLineEdit()
             layout.addRow(f"{label}:", self.text_inputs[field])
@@ -311,8 +315,35 @@ class FolderPathDialog(QDialog):
         super().accept()
 
 
+class FontSizeDialog(QDialog):
+    """アプリ全体のフォントサイズの入力"""
+
+    def __init__(self, current_size: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("フォントサイズ")
+        self.setModal(True)
+        layout = QFormLayout(self)
+        self.font_size_input = QLineEdit(str(current_size))
+        layout.addRow(f"フォントサイズ({MIN_FONT_SIZE}〜{MAX_FONT_SIZE}):", self.font_size_input)
+        layout.addRow(create_ok_cancel_buttons(self))
+
+    def font_size(self) -> int | None:
+        """入力したサイズ。数字でないか範囲外なら None"""
+        text = self.font_size_input.text().strip()
+        if not text.isdecimal():
+            return None
+        size = int(text)
+        return size if MIN_FONT_SIZE <= size <= MAX_FONT_SIZE else None
+
+    def accept(self):
+        if self.font_size() is None:
+            QMessageBox.warning(self, "警告", f"フォントサイズは {MIN_FONT_SIZE}〜{MAX_FONT_SIZE} の数字で入力してください。")
+            return
+        super().accept()
+
+
 class SettingsDialog(QDialog):
-    """xlsm取り込み・CSV出力・フォルダパスのボタンをまとめたダイアログ。押したボタンの処理はダイアログを閉じてから行う"""
+    """設定の各機能のボタンをまとめたダイアログ。押したボタンの処理はダイアログを閉じてから行う"""
 
     def __init__(self, actions: list[tuple[str, Callable[[], object]]], parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -388,16 +419,34 @@ class DocumentDetailDialog(QDialog):
 
 
 class ColumnFilterDialog(QDialog):
-    """列の値をチェックボックスで選んで絞り込む(Excel のオートフィルタに近い)"""
+    """列の値をチェックボックスで選んで絞り込む(Excel のオートフィルタに近い)
 
-    def __init__(self, heading: str, values: list[str], selected: set[str] | None,
+    文字の列は部分一致、日付の列は日付の範囲でも絞り込める
+    """
+
+    def __init__(self, column: int, values: list[str], current: ColumnFilter | None,
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f"{heading}のフィルタ")
+        self.setWindowTitle(f"{COLUMNS[column][0]}のフィルタ")
         self.setModal(True)
         self.values = values
+        current = current or ColumnFilter()
+        selected = current.values
 
         layout = QVBoxLayout(self)
+        self.text_input: QLineEdit | None = None
+        if column in TEXT_FILTER_COLUMNS:
+            layout.addWidget(QLabel("含む文字:"))
+            self.text_input = QLineEdit(current.text)
+            layout.addWidget(self.text_input)
+
+        self.date_inputs: tuple[tuple[QDateEdit, QCheckBox], tuple[QDateEdit, QCheckBox]] | None = None
+        if column in DATE_COLUMNS:
+            date_form = QFormLayout()
+            self.date_inputs = (self.add_date_row(date_form, "開始日:", current.date_from),
+                                self.add_date_row(date_form, "終了日:", current.date_to))
+            layout.addLayout(date_form)
+
         self.select_all_input = QCheckBox("すべて選択")
         self.select_all_input.setChecked(selected is None)
         self.select_all_input.clicked.connect(self.set_all_checked)
@@ -413,6 +462,25 @@ class ColumnFilterDialog(QDialog):
         layout.addWidget(self.value_list)
 
         layout.addWidget(create_ok_cancel_buttons(self))
+
+    @staticmethod
+    def add_date_row(form: QFormLayout, label: str, value: str | None) -> tuple[QDateEdit, QCheckBox]:
+        """日付欄と「指定しない」のチェックの行"""
+        date_input = create_date_edit()
+        no_date_input = QCheckBox("指定しない")
+        no_date_input.toggled.connect(date_input.setDisabled)
+        date = QDate.fromString(value or '', 'yyyy-MM-dd')
+        date_input.setDate(date if date.isValid() else QDate.currentDate())
+        no_date_input.setChecked(value is None)
+        row = QHBoxLayout()
+        row.addWidget(date_input)
+        row.addWidget(no_date_input)
+        form.addRow(label, row)
+        return date_input, no_date_input
+
+    @staticmethod
+    def date_value(date_input: QDateEdit, no_date_input: QCheckBox) -> str | None:
+        return None if no_date_input.isChecked() else date_input.date().toString('yyyy-MM-dd')
 
     def set_all_checked(self, checked: bool) -> None:
         state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
@@ -434,8 +502,24 @@ class ColumnFilterDialog(QDialog):
         checked = self.checked_values()
         return None if len(checked) == len(self.values) else checked
 
+    def column_filter(self) -> ColumnFilter:
+        """入力したフィルタの条件"""
+        selected = self.selected_values()
+        date_from, date_to = (None, None) if self.date_inputs is None else (
+            self.date_value(*self.date_inputs[0]), self.date_value(*self.date_inputs[1]))
+        return ColumnFilter(
+            values=None if selected is None else frozenset(selected),
+            text=self.text_input.text().strip() if self.text_input is not None else '',
+            date_from=date_from,
+            date_to=date_to,
+        )
+
     def accept(self):
         if not self.checked_values():
             QMessageBox.warning(self, "警告", "表示する値を1つ以上選んでください。")
+            return
+        column_filter = self.column_filter()
+        if column_filter.date_from and column_filter.date_to and column_filter.date_from > column_filter.date_to:
+            QMessageBox.warning(self, "警告", "開始日は終了日以前の日付にしてください。")
             return
         super().accept()
