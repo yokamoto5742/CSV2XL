@@ -97,4 +97,3 @@ Python 版の動作を言語に依存しない形でまとめる。C# 版はこ�
 ## 端末ごとの設定(config.ini)
 
 `[Paths]`(downloads_path, database_path, backup_path, processed_path, xlsm_path)、`[Appearance]`(font_size, window_width, window_height, start_maximized, side_panel_width)、`[Backup] retention_days`、`[DialogSize]`、`[Staff] ordered_names`(担当者名を一括登録するためのカンマ区切りのリスト)。
-`[ExcludeDocs]` / `[ExcludeDoctors]` は移行スクリプトが DB に移すときだけ読む。

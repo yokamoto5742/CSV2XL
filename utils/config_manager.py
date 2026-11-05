@@ -58,10 +58,6 @@ class ConfigManager:
         self.config[section].update(values)
         self.save_config()
 
-    def get_list(self, section: str) -> list[str]:
-        """カンマ区切りの 'list' キーをリストとして取得"""
-        return split_comma_list(self.config.get(section, 'list', fallback=''))
-
     def get_downloads_path(self) -> str:
         return self.config.get('Paths', 'downloads_path', fallback=str(Path.home() / "Downloads"))
 

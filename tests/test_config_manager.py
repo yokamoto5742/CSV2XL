@@ -19,7 +19,6 @@ class TestConfigManager:
         assert config.get_font_size() == 9
         assert config.get_window_size() == (300, 200)
         assert config.get_backup_retention_days() == 7
-        assert config.get_list('ExcludeDocs') == []
         assert config.get_backup_path() == r"C:\Shinseikai\CSV2XL\backup"
         assert config.get_database_path() == r"C:\Shinseikai\CSV2XL\医療文書担当一覧.db"
 
@@ -33,12 +32,6 @@ class TestConfigManager:
         assert reloaded.get_window_size() == (400, 300)
         assert reloaded.get_backup_path() == r"D:\backup"
         assert reloaded.get_database_path() == r"\\server\share\test.db"
-
-    def test_get_list(self, config: ConfigManager) -> None:
-        """カンマ区切りのリストを読み込む(空白や空要素は除く)"""
-        config.config_file.write_text('[ExcludeDoctors]\nlist = 田中, 山田 ,,\n', encoding='utf-8')
-
-        assert ConfigManager(config.config_file).get_list('ExcludeDoctors') == ['田中', '山田']
 
     def test_get_staff_names(self, config: ConfigManager) -> None:
         """[Staff] ordered_names を順番どおりに読む(CP932 の外字も化けない)"""

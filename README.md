@@ -73,17 +73,6 @@ uv run python main.py
 | 画面サイズ | アプリ全体のフォントサイズ(すぐに反映)、ウインドウサイズ、起動時に最大化するか | config.ini(端末ごと) |
 | フォルダパス | ダウンロード・データベースファイル・バックアップ・xlsm の場所 | config.ini(端末ごと) |
 
-## Excel からの移行(最初に1回だけ)
-
-医療文書担当一覧.xlsm の全行と、設定シートの担当者名、config.ini の除外リストをデータベースに移します。
-
-```bash
-uv run python -m scripts.migrate_from_xlsm "\\Jimtower\...\医療文書担当一覧.xlsm"
-```
-
-- 移行先は config.ini の `[Paths] database_path`(省略時は `C:\Shinseikai\CSV2XL\医療文書担当一覧.db`)です。2 番目の引数で別の場所を指定できます
-- データベースにすでに行がある場合は、二重登録を防ぐため中止します
-
 ## データベースの場所
 
 既定は `C:\Shinseikai\CSV2XL\医療文書担当一覧.db` です。共有フォルダに移す場合は、ファイルをコピーしてから各 PC の「フォルダの場所」で「データベースファイル」を変更してください。
@@ -111,8 +100,6 @@ CSV2XL/
 ├── utils/
 │   ├── config_manager.py       # 設定ファイル管理
 │   └── config.ini              # 設定ファイル
-├── scripts/
-│   └── migrate_from_xlsm.py    # Excel からの移行
 ├── docs/
 │   └── spec.md                 # 仕様書(C# 版への移植用)
 ├── tests/

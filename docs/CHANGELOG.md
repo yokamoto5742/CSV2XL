@@ -6,6 +6,12 @@
 バージョン管理は[Semantic Versioning](https://semver.org/lang/ja/)に従っています。
 
 
+## [2.2.1] - 2026-11-05
+
+### 削除
+
+- **Excel からの移行スクリプト**(`scripts/migrate_from_xlsm.py`): xlsm取り込みと役割が重なったため削除。あわせて、移行スクリプトでしか使っていなかった `ConfigManager.get_list` も削除(config.ini の `[ExcludeDocs]` / `[ExcludeDoctors]` は読まなくなった)
+
 ## [2.2.0] - 2026-11-05
 
 ### 追加
