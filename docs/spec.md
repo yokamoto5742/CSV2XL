@@ -5,7 +5,8 @@ Python 版の動作を言語に依存しない形でまとめる。C# 版はこ�
 ## データベース
 
 - SQLite。スキーマは `services/schema.sql`(C# 版でもこのファイルをそのまま使う)。
-- スキーマの版は `PRAGMA user_version` で管理する(現在 1)。0 なら `schema.sql` を実行する。
+- スキーマの版は `PRAGMA user_version` で管理する(現在 2)。0 なら `schema.sql` を実行する。
+- 版 1 → 2 の移行: `BEGIN IMMEDIATE` でロックを取り、版がまだ 1 なら `ALTER TABLE documents ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0` と `PRAGMA user_version = 2` を実行してコミットする(複数の端末が同時に開いても二重に追加しない)。
 - 共有ファイルサーバーに置くため、次の設定で使う。
   - `PRAGMA journal_mode=DELETE`(WAL はネットワーク越しでは使えない)
   - ロック待ちは 5 秒(`busy_timeout`)
@@ -26,11 +27,13 @@ Python 版の動作を言語に依存しない形でまとめる。C# 版はこ�
 | department | 診療科 | 不可 |
 | doctor_name | 医師名 | 不可 |
 | staff_name | 担当者名 | ドロップダウン(担当者リスト+空欄) |
-| requested_date | 医師依頼日 | 手入力。`YYYY/MM/DD` か `YYYY-MM-DD`(月日は1桁も可、全角は半角にする)。空欄で消去 |
+| requested_date | 医師依頼日 | 日付欄(▼でカレンダー、`YYYY/MM/DD` の打ち込みも可)。空欄から開くと今日の日付。カレンダーで日付をクリックするとすぐ保存。セルを選んで Delete キーで消去 |
 | note | 備考 | 自由入力(前後の空白は除く。空欄は NULL) |
 
 - 編集はセルを確定した時点で保存する。
 - 楽観ロック: `UPDATE … SET …, version = version + 1 WHERE id = ? AND version = ?`。更新件数が 0 なら他の端末が先に更新しているので、警告を出して読み直す。
+- 削除は論理削除: `UPDATE … SET deleted = 1, version = version + 1 WHERE id = ? AND version = ? AND deleted = 0`(楽観ロックは更新と同じ)。一覧には `deleted = 0` の行だけを表示する。CSV 取り込みの重複チェックには削除済みの行も含めるため、同じ CSV を取り込み直しても削除した行は戻らない。
+- 手動の追加: 預り日〜医師名をすべて入力して1行追加する(重複チェックはしない)。
 
 ### list_items(全端末で共有するリスト)
 
@@ -56,8 +59,13 @@ Python 版の動作を言語に依存しない形でまとめる。C# 版はこ�
 
 ## 一覧画面
 
-- 1つのウィンドウの左に操作パネル、右に担当一覧を置く。起動時に DB へ接続して一覧を表示し、ウィンドウを最大化する(接続できなければエラーを表示し、一覧は空のまま)。
-- 左パネルの並び: タイトル(医療文書担当一覧 vX.Y.Z) / 患者ID検索(入力欄・検索・前へ・次へ・n/m件) / Papyrus: CSV取り込み / 除外項目: 文書名・医師名 / 担当者名・画面サイズ・フォルダパス / 閉じる。
+- 1つのウィンドウの左に操作パネル、右に担当一覧を置く。起動時に DB へ接続して一覧を表示する(接続できなければエラーを表示し、一覧は空のまま)。ウィンドウは設定により最大化するか、指定の大きさで開く。
+- 左パネルと一覧の境目はドラッグで動かせる。終了時の左パネルの幅を保存し、次回もその幅で開く(左パネルの最小幅より狭くはならない)。
+- 左パネルの並び: タイトル(医療文書担当一覧 vX.Y.Z) / 患者ID検索(入力欄・検索・前へ・次へ・n/m件) / Papyrus: CSV取り込み / データ: 行の追加・行の削除・CSV出力 / 除外項目: 文書名・医師名 / 担当者名・画面サイズ・フォルダパス / 閉じる。
+- 行の削除: 選んだ行の患者ID・患者名・文書名を表示して確認してから削除する。未選択なら「削除する行を選んでください。」。
+- CSV出力: 画面と同じ 9 列(日本語の見出し)を画面の並び順・表示形式のまま、BOM 付き UTF-8 で書き出す。保存先はダイアログで選ぶ(既定はダウンロードフォルダの `医療文書担当一覧_YYYYMMDDhhmm.csv`)。
+- 画面サイズ: フォントサイズはアプリ全体(一覧・左パネル・ダイアログ)に OK で即時反映し、一覧の行の高さを文字の高さ + 8px にする。最大化していなければウィンドウの大きさも変える。
+- 担当者名: ダイアログの「configから読み込み」で一覧を config.ini の `[Staff] ordered_names` に置き換える(OK で DB に保存)。
 - フォルダパスを保存したら、DB に接続し直して一覧を作り直す。
 - 既定の並び: 預り日 → 診療科 → 患者ID の昇順(同じ値なら登録順)。開いたときは末尾(最新)の行を表示する。
 - 列見出しをクリックすると、その列で昇順と降順を切り替える。空欄の行は、昇順でも降順でも末尾に置く。
@@ -68,5 +76,5 @@ Python 版の動作を言語に依存しない形でまとめる。C# 版はこ�
 
 ## 端末ごとの設定(config.ini)
 
-`[Paths]`(downloads_path, database_path, backup_path, processed_path)、`[Appearance]`、`[Backup] retention_days`、`[DialogSize]`。
+`[Paths]`(downloads_path, database_path, backup_path, processed_path)、`[Appearance]`(font_size, window_width, window_height, start_maximized, side_panel_width)、`[Backup] retention_days`、`[DialogSize]`、`[Staff] ordered_names`(担当者名を一括登録するためのカンマ区切りのリスト)。
 `[ExcludeDocs]` / `[ExcludeDoctors]` は移行スクリプトが DB に移すときだけ読む。

@@ -1,14 +1,18 @@
 import os
 from pathlib import Path
 
+from PyQt6.QtCore import QDate
 from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QLineEdit, QListWidget, QDialogButtonBox, QFileDialog,
-    QMessageBox
+    QMessageBox, QCheckBox, QFormLayout
 )
 
+from app.document_window import create_date_edit
+from services.document_repository import NewDocument
 from services.list_repository import EXCLUDE_DOCS, EXCLUDE_DOCTORS, STAFF, ListRepository
+from services.validators import parse_patient_id
 from utils.config_manager import ConfigManager
 
 class ListItemDialog(QDialog):
@@ -90,6 +94,69 @@ class ExcludeDoctorsDialog(ListItemDialog):
 class StaffNamesDialog(ListItemDialog):
     def __init__(self, repository: ListRepository, parent=None):
         super().__init__("担当者名", STAFF, repository, parent)
+        load_button = QPushButton("configから読み込み")
+        load_button.clicked.connect(self.load_from_config)
+        layout = self.layout()
+        if isinstance(layout, QVBoxLayout):
+            # OK・キャンセルの上に置く
+            layout.insertWidget(layout.count() - 1, load_button)
+
+    def load_from_config(self) -> None:
+        """一覧を config.ini の [Staff] ordered_names で置き換える(OK で DB に保存される)"""
+        names = ConfigManager().get_staff_names()
+        if not names:
+            QMessageBox.warning(self, "警告", "config.ini の [Staff] ordered_names に担当者名がありません。")
+            return
+        self.item_list.clear()
+        self.item_list.addItems(names)
+
+
+class AddDocumentDialog(QDialog):
+    """手動で追加する行(預り日〜医師名)の入力"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("行の追加")
+        self.setModal(True)
+
+        layout = QFormLayout()
+        self.received_date_input = create_date_edit()
+        self.received_date_input.setDate(QDate.currentDate())
+        layout.addRow("預り日:", self.received_date_input)
+        self.patient_id_input = QLineEdit()
+        layout.addRow("患者ID:", self.patient_id_input)
+        self.text_inputs: dict[str, QLineEdit] = {}
+        for field, label in (("patient_name", "患者名"), ("document_name", "文書名"),
+                             ("department", "診療科"), ("doctor_name", "医師名")):
+            self.text_inputs[field] = QLineEdit()
+            layout.addRow(f"{label}:", self.text_inputs[field])
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addRow(buttons)
+        self.setLayout(layout)
+
+    def new_document(self) -> NewDocument | None:
+        """入力内容。未入力の項目や数字でない患者IDがあれば None"""
+        patient_id = parse_patient_id(self.patient_id_input.text())
+        texts = {field: line_edit.text().strip() for field, line_edit in self.text_inputs.items()}
+        if patient_id is None or not all(texts.values()):
+            return None
+        return NewDocument(
+            received_date=self.received_date_input.date().toString('yyyy-MM-dd'),
+            patient_id=patient_id,
+            **texts,
+        )
+
+    def accept(self):
+        if self.new_document() is None:
+            QMessageBox.warning(self, "警告", "すべての項目を入力してください。\n患者IDは数字で入力してください。")
+            return
+        super().accept()
 
 
 class FolderPathDialog(QDialog):
@@ -211,13 +278,16 @@ class AppearanceDialog(QDialog):
 
         layout.addWidget(QLabel("ウィンドウの幅:"))
         self.window_width_input = QLineEdit()
-        self.window_width_input.setValidator(QIntValidator(200, 1000))
+        self.window_width_input.setValidator(QIntValidator(200, 3840))
         layout.addWidget(self.window_width_input)
 
         layout.addWidget(QLabel("ウィンドウの高さ:"))
         self.window_height_input = QLineEdit()
-        self.window_height_input.setValidator(QIntValidator(150, 800))
+        self.window_height_input.setValidator(QIntValidator(150, 2160))
         layout.addWidget(self.window_height_input)
+
+        self.start_maximized_input = QCheckBox("起動時に最大化する")
+        layout.addWidget(self.start_maximized_input)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
@@ -237,6 +307,7 @@ class AppearanceDialog(QDialog):
         window_size = self.config.get_window_size()
         self.window_width_input.setText(str(window_size[0]))
         self.window_height_input.setText(str(window_size[1]))
+        self.start_maximized_input.setChecked(self.config.get_start_maximized())
 
     def accept(self):
         inputs = [self.font_size_input, self.window_width_input, self.window_height_input]
@@ -249,5 +320,5 @@ class AppearanceDialog(QDialog):
             int(self.window_width_input.text()),
             int(self.window_height_input.text())
         )
-        QMessageBox.information(self, "設定完了", "設定を保存しました。\n変更を適用するにはアプリケーションを再起動してください。")
+        self.config.set_start_maximized(self.start_maximized_input.isChecked())
         super().accept()

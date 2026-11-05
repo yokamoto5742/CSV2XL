@@ -76,6 +76,54 @@ class TestUpdateEditableFields:
             conn_b.close()
 
 
+class TestAddDocument:
+    def test_adds_even_if_duplicate(self, connection: sqlite3.Connection) -> None:
+        """手動の追加は重複チェックをしない"""
+        repository = DocumentRepository(connection)
+        repository.add_new_documents([make_new_document(1)])
+
+        repository.add_document(make_new_document(1))
+
+        assert [doc.patient_id for doc in repository.fetch_all()] == [1, 1]
+
+
+class TestDeleteDocument:
+    def test_hides_deleted_document(self, connection: sqlite3.Connection) -> None:
+        repository = DocumentRepository(connection)
+        repository.add_new_documents([make_new_document(1), make_new_document(2)])
+
+        assert repository.delete_document(repository.fetch_all()[0]) is True
+
+        assert [doc.patient_id for doc in repository.fetch_all()] == [2]
+
+    def test_csv_does_not_restore_deleted_document(self, connection: sqlite3.Connection) -> None:
+        """削除した行と同じ内容を取り込んでも追加しない"""
+        repository = DocumentRepository(connection)
+        repository.add_new_documents([make_new_document(1)])
+        repository.delete_document(repository.fetch_all()[0])
+
+        assert repository.add_new_documents([make_new_document(1)]) == 0
+        assert repository.fetch_all() == []
+
+    def test_conflict_returns_false(self, tmp_path: Path) -> None:
+        """別端末が先に更新していたら削除しない"""
+        db_path = str(tmp_path / 'shared.db')
+        conn_a = connect(db_path)
+        conn_b = connect(db_path)
+        try:
+            repo_a = DocumentRepository(conn_a)
+            repo_b = DocumentRepository(conn_b)
+            repo_a.add_new_documents([make_new_document()])
+            doc_a = repo_a.fetch_all()[0]
+            repo_b.update_editable_fields(dataclasses.replace(repo_b.fetch_all()[0], note='B'))
+
+            assert repo_a.delete_document(doc_a) is False
+            assert len(repo_a.fetch_all()) == 1
+        finally:
+            conn_a.close()
+            conn_b.close()
+
+
 class TestDataVersion:
     def test_changes_when_other_connection_commits(self, tmp_path: Path) -> None:
         db_path = str(tmp_path / 'shared.db')

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS documents (
     requested_date TEXT,              -- 医師依頼日
     note           TEXT,              -- 備考
     version        INTEGER NOT NULL DEFAULT 1,  -- 楽観ロック用。更新のたびに1増やす
+    deleted        INTEGER NOT NULL DEFAULT 0,  -- 1 なら削除済み(CSV の重複チェックに使うため行は残す)
     created_at     TEXT    NOT NULL,
     updated_at     TEXT    NOT NULL
 );
@@ -32,4 +33,4 @@ CREATE TABLE IF NOT EXISTS list_items (
     UNIQUE (category, name)
 );
 
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;

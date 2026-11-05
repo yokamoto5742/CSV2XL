@@ -40,6 +40,23 @@ class TestConfigManager:
 
         assert ConfigManager(config.config_file).get_list('ExcludeDoctors') == ['田中', '山田']
 
+    def test_get_staff_names(self, config: ConfigManager) -> None:
+        """[Staff] ordered_names を順番どおりに読む(CP932 の外字も化けない)"""
+        config.config_file.write_text('[Staff]\nordered_names = 植田, 花﨑,,山本\n', encoding='utf-8')
+
+        assert ConfigManager(config.config_file).get_staff_names() == ['植田', '花﨑', '山本']
+
+    def test_appearance_defaults_and_save(self, config: ConfigManager) -> None:
+        assert config.get_start_maximized() is True
+        assert config.get_side_panel_width() == 200
+
+        config.set_start_maximized(False)
+        config.set_side_panel_width(320)
+
+        reloaded = ConfigManager(config.config_file)
+        assert reloaded.get_start_maximized() is False
+        assert reloaded.get_side_panel_width() == 320
+
 
 class TestGetConfigPath:
     def test_not_frozen(self, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,13 +1,18 @@
+import datetime
 import sqlite3
 from collections.abc import Callable
+from pathlib import Path
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QPushButton, QLabel, QLineEdit, QMessageBox
+    QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
+    QPushButton, QLabel, QLineEdit, QMessageBox, QFileDialog, QSplitter
 )
 
-from app.dialogs import ExcludeDocsDialog, ExcludeDoctorsDialog, StaffNamesDialog, AppearanceDialog, FolderPathDialog
+from app.dialogs import (
+    AddDocumentDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, StaffNamesDialog, AppearanceDialog, FolderPathDialog
+)
 from app.document_window import DocumentListWidget
 from utils.config_manager import ConfigManager
 from services.csv_import import import_csv_to_database
@@ -33,6 +38,14 @@ CSV_BUTTON_STYLE = """
     }
 """
 SECTION_SPACING = 12
+MAX_TABLE_WIDTH = 10000
+
+
+def apply_app_font_size(point_size: int) -> None:
+    """一覧・左パネル・ダイアログなど、アプリ全体のフォントサイズを変える"""
+    font = QApplication.font()
+    font.setPointSize(point_size)
+    QApplication.setFont(font)
 
 
 def add_button(layout: QVBoxLayout | QHBoxLayout, text: str, slot: Callable[[], object]) -> QPushButton:
@@ -53,19 +66,21 @@ class MainWindow(QMainWindow):
 
         cleanup_old_backup_files()
 
-        font = self.font()
-        font.setPointSize(self.config.get_font_size())
-        self.setFont(font)
-        # 起動時は最大化する。この大きさは最大化を解除したときに使う
+        apply_app_font_size(self.config.get_font_size())
+        # 最大化して起動するときは、この大きさを最大化を解除したときに使う
         self.resize(*self.config.get_window_size())
         title = f"医療文書担当一覧 v{__version__}"
         self.setWindowTitle(title)
         self.setStyleSheet("QMainWindow { border: 5px solid darkgreen; }")
 
-        main_widget = QWidget()
-        self.content_layout = QHBoxLayout(main_widget)
-        self.content_layout.addLayout(self.create_side_panel(title))
-        self.setCentralWidget(main_widget)
+        # 左パネルと一覧の境目をドラッグして幅を変えられるようにする
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        side_panel = QWidget()
+        side_panel.setLayout(self.create_side_panel(title))
+        self.splitter.addWidget(side_panel)
+        self.setCentralWidget(self.splitter)
+        self.side_panel_width = self.config.get_side_panel_width()
 
         self.open_document_list()
 
@@ -78,6 +93,12 @@ class MainWindow(QMainWindow):
 
         panel.addWidget(QLabel("Papyrus"))
         add_button(panel, "CSV取り込み", self.import_csv).setStyleSheet(CSV_BUTTON_STYLE)
+        panel.addSpacing(SECTION_SPACING)
+
+        panel.addWidget(QLabel("データ"))
+        add_button(panel, "行の追加", self.add_document)
+        add_button(panel, "行の削除", self.delete_document)
+        add_button(panel, "CSV出力", self.export_csv)
         panel.addSpacing(SECTION_SPACING)
 
         panel.addWidget(QLabel("除外項目"))
@@ -126,13 +147,17 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "エラー", f"担当一覧を開けませんでした:\n{str(e)}")
             return
         document_widget.search_status_changed.connect(self.search_result_label.setText)
-        self.content_layout.addWidget(document_widget, stretch=1)
+        self.splitter.addWidget(document_widget)
+        self.splitter.setStretchFactor(1, 1)
+        # 一覧側は残りの幅いっぱいに広がるので、大きめの値を渡しておく
+        self.splitter.setSizes([self.side_panel_width, MAX_TABLE_WIDTH])
         self.document_widget = document_widget
 
     def close_connection(self) -> None:
         if self.document_widget is not None:
+            self.side_panel_width = self.splitter.sizes()[0]
             self.document_widget.refresh_timer.stop()
-            self.content_layout.removeWidget(self.document_widget)
+            self.document_widget.setParent(None)
             self.document_widget.deleteLater()
             self.document_widget = None
             self.search_result_label.setText("")
@@ -161,6 +186,34 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "取り込み完了", f"{added_count}件を追加しました。")
         self.open_document_list()
 
+    def add_document(self) -> None:
+        if self.document_widget is None:
+            return
+        dialog = AddDocumentDialog(self)
+        if dialog.exec():
+            new_document = dialog.new_document()
+            if new_document is not None:
+                self.document_widget.add_document(new_document)
+
+    def delete_document(self) -> None:
+        if self.document_widget is not None:
+            self.document_widget.delete_selected()
+
+    def export_csv(self) -> None:
+        if self.document_widget is None:
+            return
+        file_name = f"医療文書担当一覧_{datetime.datetime.now():%Y%m%d%H%M}.csv"
+        default_path = str(Path(self.config.get_downloads_path()) / file_name)
+        path, _ = QFileDialog.getSaveFileName(self, "CSV出力", default_path, "CSV ファイル (*.csv)")
+        if not path:
+            return
+        try:
+            self.document_widget.export_csv(path)
+        except OSError as e:
+            QMessageBox.critical(self, "エラー", f"CSVファイルの出力に失敗しました:\n{str(e)}")
+            return
+        QMessageBox.information(self, "出力完了", "CSVファイルを出力しました。")
+
     def show_list_dialog(self, dialog_class: type[ExcludeDocsDialog | ExcludeDoctorsDialog | StaffNamesDialog]) -> None:
         try:
             dialog = dialog_class(ListRepository(self.get_connection()), self)
@@ -181,7 +234,17 @@ class MainWindow(QMainWindow):
 
     def show_appearance_dialog(self) -> None:
         dialog = AppearanceDialog(self)
-        dialog.exec()
+        if dialog.exec():
+            self.apply_appearance()
+
+    def apply_appearance(self) -> None:
+        """保存した外観の設定を再起動せずに反映する"""
+        self.config = ConfigManager()
+        apply_app_font_size(self.config.get_font_size())
+        if self.document_widget is not None:
+            self.document_widget.apply_font_size()
+        if not self.isMaximized():
+            self.resize(*self.config.get_window_size())
 
     def show_folder_path_dialog(self) -> None:
         dialog = FolderPathDialog(self)
@@ -192,4 +255,5 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent | None) -> None:
         self.close_connection()
+        self.config.set_side_panel_width(self.side_panel_width)
         super().closeEvent(event)

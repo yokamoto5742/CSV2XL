@@ -5,6 +5,10 @@ from dataclasses import dataclass
 from services.database import now_text
 
 DocumentKey = tuple[str, int, str, str, str, str]
+INSERT_SQL = (
+    "INSERT INTO documents (received_date, patient_id, patient_name, document_name,"
+    " department, doctor_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+)
 
 
 @dataclass(frozen=True)
@@ -48,9 +52,26 @@ class DocumentRepository:
     def fetch_all(self) -> list[Document]:
         rows = self.connection.execute(
             "SELECT id, received_date, patient_id, patient_name, document_name, department,"
-            " doctor_name, staff_name, requested_date, note, version FROM documents ORDER BY id"
+            " doctor_name, staff_name, requested_date, note, version FROM documents"
+            " WHERE deleted = 0 ORDER BY id"
         ).fetchall()
         return [Document(**dict(row)) for row in rows]
+
+    def add_document(self, document: NewDocument) -> None:
+        """手動で1行追加する(重複していても追加する)"""
+        now = now_text()
+        with self.connection:
+            self.connection.execute(INSERT_SQL, (*document.key(), now, now))
+
+    def delete_document(self, document: Document) -> bool:
+        """削除済みにする。読み込み後に別端末で更新されていた場合は削除せずに False を返す"""
+        with self.connection:
+            cursor = self.connection.execute(
+                "UPDATE documents SET deleted = 1, version = version + 1, updated_at = ?"
+                " WHERE id = ? AND version = ? AND deleted = 0",
+                (now_text(), document.id, document.version)
+            )
+        return cursor.rowcount > 0
 
     def add_new_documents(self, documents: list[NewDocument]) -> int:
         """既存行と A〜F 列が同じものを除いて追加し、追加した件数を返す
@@ -66,11 +87,7 @@ class DocumentRepository:
                 " FROM documents"
             )}
             new_documents = [doc for doc in documents if doc.key() not in existing_keys]
-            self.connection.executemany(
-                "INSERT INTO documents (received_date, patient_id, patient_name, document_name,"
-                " department, doctor_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [(*doc.key(), now, now) for doc in new_documents]
-            )
+            self.connection.executemany(INSERT_SQL, [(*doc.key(), now, now) for doc in new_documents])
         return len(new_documents)
 
     def update_editable_fields(self, document: Document) -> Document | None:

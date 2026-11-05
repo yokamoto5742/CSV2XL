@@ -81,6 +81,13 @@ class DocumentTableModel(QAbstractTableModel):
     def find_rows(self, patient_id: int) -> list[int]:
         return [row for row, doc in enumerate(self.documents) if doc.patient_id == patient_id]
 
+    def find_row_by_id(self, document_id: int) -> int | None:
+        return next((row for row, doc in enumerate(self.documents) if doc.id == document_id), None)
+
+    def export_rows(self) -> list[list[str]]:
+        """画面の並び順・表示形式のままの全行"""
+        return [[format_cell(doc, column) for column in range(len(COLUMNS))] for doc in self.documents]
+
     def rowCount(self, parent: ModelIndex = QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self.documents)
 

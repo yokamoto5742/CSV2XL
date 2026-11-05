@@ -136,3 +136,16 @@ class TestDocumentTableModel:
     def test_find_rows(self, model: DocumentTableModel):
         assert model.find_rows(200) == [1]
         assert model.find_rows(999) == []
+
+    def test_find_row_by_id(self, model: DocumentTableModel):
+        assert model.find_row_by_id(model.document(2).id) == 2
+        assert model.find_row_by_id(999) is None
+
+    def test_export_rows(self, model: DocumentTableModel):
+        """画面の並び順・表示形式のまま返す"""
+        model.setData(model.index(0, REQUESTED_DATE_COLUMN), '2025/01/15')
+
+        rows = model.export_rows()
+
+        assert [row[1] for row in rows] == ['100', '200', '300']
+        assert rows[0] == ['2025/01/10', '100', '山田　太郎', '診断書', '内科', '田中', '', '2025/01/15', '']

@@ -21,6 +21,11 @@ def get_config_path() -> Path:
 CONFIG_PATH = get_config_path()
 
 
+def split_comma_list(text: str) -> list[str]:
+    """カンマ区切りの文字列をリストにする(空白や空要素は除く)"""
+    return [item.strip() for item in text.split(',') if item.strip()]
+
+
 class ConfigManager:
     def __init__(self, config_file: Path | str = CONFIG_PATH) -> None:
         self.config_file: Path = Path(config_file)
@@ -55,8 +60,7 @@ class ConfigManager:
 
     def get_list(self, section: str) -> list[str]:
         """カンマ区切りの 'list' キーをリストとして取得"""
-        items = self.config.get(section, 'list', fallback='')
-        return [item.strip() for item in items.split(',') if item.strip()]
+        return split_comma_list(self.config.get(section, 'list', fallback=''))
 
     def get_downloads_path(self) -> str:
         return self.config.get('Paths', 'downloads_path', fallback=str(Path.home() / "Downloads"))
@@ -97,6 +101,22 @@ class ConfigManager:
 
     def set_window_size(self, width: int, height: int) -> None:
         self._set('Appearance', {'window_width': str(width), 'window_height': str(height)})
+
+    def get_start_maximized(self) -> bool:
+        return self.config.getboolean('Appearance', 'start_maximized', fallback=True)
+
+    def set_start_maximized(self, maximized: bool) -> None:
+        self._set('Appearance', {'start_maximized': str(maximized)})
+
+    def get_side_panel_width(self) -> int:
+        return self.config.getint('Appearance', 'side_panel_width', fallback=200)
+
+    def set_side_panel_width(self, width: int) -> None:
+        self._set('Appearance', {'side_panel_width': str(width)})
+
+    def get_staff_names(self) -> list[str]:
+        """担当者名を一括登録するためのカンマ区切りのリスト"""
+        return split_comma_list(self.config.get('Staff', 'ordered_names', fallback=''))
 
     def get_backup_retention_days(self) -> int:
         """バックアップファイルの保持日数を取得"""

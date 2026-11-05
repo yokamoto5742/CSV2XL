@@ -66,6 +66,10 @@ class FakeDocumentListWidget(QWidget):
         self.show_next_hit = MagicMock()
         self.show_previous_hit = MagicMock()
         self.refresh_timer = MagicMock()
+        self.apply_font_size = MagicMock()
+        self.add_document = MagicMock()
+        self.delete_selected = MagicMock()
+        self.export_csv = MagicMock()
 
 
 @pytest.fixture
@@ -101,9 +105,10 @@ class TestMainWindow:
         document_widget = fake_widget(window)
         assert document_widget.connection is db_connect.return_value
         document_widget.load_initial.assert_called_once()
-        assert window.content_layout.indexOf(document_widget) >= 0
+        assert window.splitter.indexOf(document_widget) == 1
+        assert QApplication.font().pointSize() == ConfigManager().get_font_size()
 
-        for text in ("検索", "前へ", "次へ", "CSV取り込み", "文書名", "医師名",
+        for text in ("検索", "前へ", "次へ", "CSV取り込み", "行の追加", "行の削除", "CSV出力", "文書名", "医師名",
                      "担当者名", "画面サイズ", "フォルダパス", "閉じる"):
             find_button(window, text)
 
@@ -197,6 +202,84 @@ class TestMainWindow:
 
         mock_dialog.assert_called_once_with(window)
         mock_dialog.return_value.exec.assert_called_once()
+
+    def test_apply_appearance(self, app, backup_config, db_connect):
+        """保存したフォントサイズを再起動せずにアプリ全体へ反映する"""
+        window = MainWindow()
+        ConfigManager().set_font_size(15)
+
+        window.apply_appearance()
+
+        assert QApplication.font().pointSize() == 15
+        fake_widget(window).apply_font_size.assert_called_once()
+
+    @patch('app.main_window.AddDocumentDialog')
+    def test_add_document(self, mock_dialog, app, backup_config, db_connect):
+        mock_dialog.return_value.exec.return_value = 1
+        window = MainWindow()
+
+        find_button(window, "行の追加").click()
+
+        fake_widget(window).add_document.assert_called_once_with(mock_dialog.return_value.new_document.return_value)
+
+    @patch('app.main_window.AddDocumentDialog')
+    def test_add_document_cancelled(self, mock_dialog, app, backup_config, db_connect):
+        mock_dialog.return_value.exec.return_value = 0
+        window = MainWindow()
+
+        window.add_document()
+
+        fake_widget(window).add_document.assert_not_called()
+
+    def test_delete_document(self, app, backup_config, db_connect):
+        window = MainWindow()
+
+        find_button(window, "行の削除").click()
+
+        fake_widget(window).delete_selected.assert_called_once()
+
+    @patch('app.main_window.QMessageBox.information')
+    @patch('app.main_window.QFileDialog.getSaveFileName', return_value=('C:/out/list.csv', ''))
+    def test_export_csv(self, mock_save, mock_info, app, backup_config, db_connect):
+        window = MainWindow()
+
+        find_button(window, "CSV出力").click()
+
+        assert mock_save.call_args[0][2].endswith('.csv')
+        fake_widget(window).export_csv.assert_called_once_with('C:/out/list.csv')
+        mock_info.assert_called_once()
+
+    @patch('app.main_window.QFileDialog.getSaveFileName', return_value=('', ''))
+    def test_export_csv_cancelled(self, mock_save, app, backup_config, db_connect):
+        window = MainWindow()
+
+        window.export_csv()
+
+        fake_widget(window).export_csv.assert_not_called()
+
+    @patch('app.main_window.QMessageBox.critical')
+    @patch('app.main_window.QFileDialog.getSaveFileName', return_value=('C:/out/list.csv', ''))
+    def test_export_csv_error(self, mock_save, mock_critical, app, backup_config, db_connect):
+        window = MainWindow()
+        fake_widget(window).export_csv.side_effect = OSError("書き込めません")
+
+        window.export_csv()
+
+        assert "書き込めません" in mock_critical.call_args[0][2]
+
+    def test_side_panel_width_is_saved_on_close(self, app, backup_config, db_connect):
+        """左パネルの幅は終了時に保存し、次回はその幅で開く"""
+        # 左パネルの最小幅より広い値にする(狭すぎる値は Qt が最小幅に広げる)
+        ConfigManager().set_side_panel_width(400)
+        window = MainWindow()
+        window.resize(1400, 600)
+        window.show()
+        assert window.splitter.sizes()[0] == 400
+
+        window.splitter.setSizes([450, 950])
+        window.close()
+
+        assert ConfigManager().get_side_panel_width() == 450
 
     @patch('app.main_window.FolderPathDialog')
     def test_show_folder_path_dialog(self, mock_dialog, app, backup_config, db_connect):

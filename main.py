@@ -8,5 +8,8 @@ from app.main_window import MainWindow
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.showMaximized()
+    if window.config.get_start_maximized():
+        window.showMaximized()
+    else:
+        window.show()
     sys.exit(app.exec())

@@ -5,10 +5,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtWidgets import QApplication, QComboBox
+from PyQt6.QtCore import QDate, QModelIndex
+from PyQt6.QtWidgets import QApplication, QComboBox, QDateEdit, QMessageBox, QStyleOptionViewItem
 
-from app.document_table_model import STAFF_COLUMN
-from app.document_window import DocumentListWidget, StaffComboDelegate
+from app.document_table_model import REQUESTED_DATE_COLUMN, STAFF_COLUMN
+from app.document_window import ROW_PADDING, DocumentListWidget, RequestedDateDelegate, StaffComboDelegate
 from services.database import connect
 from services.document_repository import DocumentRepository
 from services.list_repository import STAFF, ListRepository
@@ -150,3 +151,127 @@ class TestStaffComboDelegate:
 
         model.setData.assert_called_once()
         assert model.setData.call_args[0][1] == '山本'
+
+
+class TestRequestedDateDelegate:
+    def index(self, window: DocumentListWidget):
+        return window.model.index(0, REQUESTED_DATE_COLUMN)
+
+    def test_editor_starts_today_when_empty(self, window: DocumentListWidget):
+        delegate = RequestedDateDelegate(window)
+        date_edit = QDateEdit()
+
+        delegate.setEditorData(date_edit, self.index(window))
+
+        assert date_edit.date() == QDate.currentDate()
+
+    def test_editor_shows_current_value(self, window: DocumentListWidget):
+        window.model.setData(self.index(window), '2025/01/15')
+        delegate = RequestedDateDelegate(window)
+        date_edit = QDateEdit()
+
+        delegate.setEditorData(date_edit, self.index(window))
+
+        assert date_edit.date() == QDate(2025, 1, 15)
+
+    def test_calendar_click_saves_date(self, window: DocumentListWidget):
+        """カレンダーで日付を選ぶとすぐ保存する"""
+        delegate = RequestedDateDelegate(window)
+        editor = delegate.createEditor(window.table, QStyleOptionViewItem(), self.index(window))
+        assert isinstance(editor, QDateEdit)
+        delegate.commitData.connect(lambda _: delegate.setModelData(editor, window.model, self.index(window)))
+
+        delegate.select_date(editor, QDate(2025, 2, 3))
+
+        assert window.model.document(0).requested_date == '2025-02-03'
+
+    def test_delete_key_clears_date(self, window: DocumentListWidget):
+        window.model.setData(self.index(window), '2025/01/15')
+        window.table.setCurrentIndex(self.index(window))
+
+        window.clear_requested_date()
+
+        assert window.model.document(0).requested_date is None
+
+    def test_delete_key_ignores_other_columns(self, window: DocumentListWidget):
+        window.model.setData(window.model.index(0, STAFF_COLUMN), '山本')
+        window.table.setCurrentIndex(window.model.index(0, STAFF_COLUMN))
+
+        window.clear_requested_date()
+
+        assert window.model.document(0).staff_name == '山本'
+
+
+class TestAddAndDelete:
+    def test_add_document_selects_new_row(self, window: DocumentListWidget):
+        window.add_document(make_new_document(999, '2025-01-01'))
+
+        assert window.model.rowCount() == 4
+        assert window.model.document(selected_row(window)).patient_id == 999
+
+    @patch('app.document_window.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes)
+    def test_delete_selected(self, mock_question, window: DocumentListWidget):
+        window.table.selectRow(1)
+        target = window.model.document(1)
+
+        window.delete_selected()
+
+        assert window.model.rowCount() == 2
+        assert window.model.find_row_by_id(target.id) is None
+
+    @patch('app.document_window.QMessageBox.question', return_value=QMessageBox.StandardButton.No)
+    def test_delete_cancelled(self, mock_question, window: DocumentListWidget):
+        window.table.selectRow(1)
+
+        window.delete_selected()
+
+        assert window.model.rowCount() == 3
+
+    @patch('app.document_window.QMessageBox.information')
+    def test_delete_without_selection(self, mock_info, window: DocumentListWidget):
+        window.table.setCurrentIndex(QModelIndex())
+
+        window.delete_selected()
+
+        mock_info.assert_called_once()
+        assert window.model.rowCount() == 3
+
+    @patch('app.document_window.QMessageBox.warning')
+    @patch('app.document_window.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes)
+    def test_delete_conflict_reloads(self, mock_question, mock_warning, window: DocumentListWidget,
+                                     tmp_path: Path):
+        """他の端末が先に更新した行は削除せず、警告して読み直す"""
+        window.table.selectRow(0)
+        other = connect(str(tmp_path / 'test.db'))
+        try:
+            other_repository = DocumentRepository(other)
+            target = next(doc for doc in other_repository.fetch_all() if doc.id == window.model.document(0).id)
+            other_repository.update_editable_fields(dataclasses.replace(target, note='他端末'))
+        finally:
+            other.close()
+
+        window.delete_selected()
+
+        assert "削除できませんでした" in mock_warning.call_args[0][2]
+        assert window.model.rowCount() == 3
+        assert window.model.document(0).note == '他端末'
+
+
+class TestExportCsv:
+    def test_export_in_display_order(self, window: DocumentListWidget, tmp_path: Path):
+        path = tmp_path / 'export.csv'
+
+        window.export_csv(str(path))
+
+        lines = path.read_text(encoding='utf-8-sig').splitlines()
+        assert lines[0] == '預り日,患者ID,患者名,文書名,診療科,医師名,担当者名,医師依頼日,備考'
+        assert [line.split(',')[0] for line in lines[1:]] == ['2025/01/10', '2025/01/11', '2025/01/12']
+
+
+def test_apply_font_size_sets_row_height(window: DocumentListWidget):
+    header = window.table.verticalHeader()
+    assert header is not None
+
+    window.apply_font_size()
+
+    assert header.defaultSectionSize() == window.table.fontMetrics().height() + ROW_PADDING

@@ -3,11 +3,14 @@ import pytest
 import configparser
 from unittest.mock import patch
 
+from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import QApplication, QDialog, QListWidget
 
 from app.dialogs import (
-    AppearanceDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, ListItemDialog, StaffNamesDialog
+    AddDocumentDialog, AppearanceDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, ListItemDialog,
+    StaffNamesDialog
 )
+from services.document_repository import NewDocument
 from services.list_repository import EXCLUDE_DOCS, EXCLUDE_DOCTORS, STAFF, ListRepository
 from utils.config_manager import ConfigManager, CONFIG_PATH
 
@@ -135,6 +138,66 @@ class TestListDialogSubclasses:
         dialog = dialog_class(list_repository)
         assert dialog.windowTitle() == title
         assert dialog.category == category
+
+
+class TestStaffNamesDialog:
+    def test_load_from_config(self, app, list_repository):
+        """config の担当者名で一覧を置き換え、OK で DB に保存する"""
+        list_repository.set_items(STAFF, ['旧担当'])
+        dialog = StaffNamesDialog(list_repository)
+
+        with patch.object(ConfigManager, 'get_staff_names', return_value=['植田', '花﨑']):
+            dialog.load_from_config()
+        with patch.object(QDialog, 'accept'):
+            dialog.accept()
+
+        assert list_repository.get_items(STAFF) == ['植田', '花﨑']
+
+    @patch('app.dialogs.QMessageBox.warning')
+    def test_load_from_config_empty(self, mock_warning, app, list_repository):
+        """config に担当者名が無ければ警告し、一覧はそのまま"""
+        list_repository.set_items(STAFF, ['山本'])
+        dialog = StaffNamesDialog(list_repository)
+
+        with patch.object(ConfigManager, 'get_staff_names', return_value=[]):
+            dialog.load_from_config()
+
+        mock_warning.assert_called_once()
+        assert dialog.item_list.count() == 1
+
+
+class TestAddDocumentDialog:
+    def fill(self, dialog: AddDocumentDialog, patient_id: str = '１２３') -> None:
+        dialog.received_date_input.setDate(QDate(2025, 1, 5))
+        dialog.patient_id_input.setText(patient_id)
+        for field, value in (("patient_name", "山田　太郎"), ("document_name", "診断書"),
+                             ("department", "内科"), ("doctor_name", "田中")):
+            dialog.text_inputs[field].setText(value)
+
+    def test_new_document(self, app):
+        dialog = AddDocumentDialog()
+        self.fill(dialog)
+
+        assert dialog.new_document() == NewDocument('2025-01-05', 123, '山田　太郎', '診断書', '内科', '田中')
+
+    @pytest.mark.parametrize("patient_id", ["", "abc"])
+    @patch('app.dialogs.QMessageBox.warning')
+    def test_rejects_invalid_patient_id(self, mock_warning, patient_id, app):
+        dialog = AddDocumentDialog()
+        self.fill(dialog, patient_id)
+
+        with patch.object(QDialog, 'accept') as mock_accept:
+            dialog.accept()
+
+        mock_accept.assert_not_called()
+        mock_warning.assert_called_once()
+
+    def test_rejects_empty_field(self, app):
+        dialog = AddDocumentDialog()
+        self.fill(dialog)
+        dialog.text_inputs["doctor_name"].setText("  ")
+
+        assert dialog.new_document() is None
 
 
 class TestFolderPathDialog:
@@ -269,8 +332,7 @@ class TestAppearanceDialog:
         assert dialog.window_width_input.text() == '400'
         assert dialog.window_height_input.text() == '300'
 
-    @patch('app.dialogs.QMessageBox.information')
-    def test_accept(self, mock_info, app, backup_config):
+    def test_accept(self, app, backup_config):
         """ダイアログ確定時の設定保存テスト"""
         dialog = AppearanceDialog()
 
@@ -278,16 +340,17 @@ class TestAppearanceDialog:
         dialog.font_size_input.setText('16')
         dialog.window_width_input.setText('450')
         dialog.window_height_input.setText('350')
+        dialog.start_maximized_input.setChecked(False)
 
         # モック化したsuperクラスのacceptメソッドでテスト
         with patch.object(QDialog, 'accept') as mock_accept:
             dialog.accept()
             mock_accept.assert_called_once()
-            mock_info.assert_called_once()
 
         # 設定が保存されたことを確認
         config = ConfigManager()
         assert config.get_font_size() == 16
+        assert config.get_start_maximized() is False
         window_size = config.get_window_size()
         assert window_size[0] == 450
         assert window_size[1] == 350
