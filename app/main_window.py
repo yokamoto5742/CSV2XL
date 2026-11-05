@@ -72,14 +72,16 @@ class MainWindow(QMainWindow):
     """左に操作ボタン、右に担当一覧を並べた1画面のウィンドウ"""
 
     def __init__(self) -> None:
+        config = ConfigManager()
+        # 作成済みのウィンドウにはフォントの変更がすぐには反映されないため、ウィンドウを作る前に設定する
+        apply_app_font_size(config.get_font_size())
         super().__init__()
-        self.config = ConfigManager()
+        self.config = config
         self.connection: sqlite3.Connection | None = None
         self.document_widget: DocumentListWidget | None = None
 
         cleanup_old_backup_files()
 
-        apply_app_font_size(self.config.get_font_size())
         self.restore_window_geometry()
         title = f"医療文書担当一覧 v{__version__}"
         self.setWindowTitle(title)
