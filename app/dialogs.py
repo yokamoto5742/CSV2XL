@@ -189,6 +189,12 @@ class FolderPathDialog(QDialog):
             lambda: self.open_folder(self.backup_path.text())
         )
 
+        self.xlsm_path = self.create_path_section(
+            layout, "xlsmフォルダ:",
+            lambda: self.browse_folder('xlsm'),
+            lambda: self.open_folder(self.xlsm_path.text())
+        )
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel
@@ -231,11 +237,16 @@ class FolderPathDialog(QDialog):
         self.downloads_path.setText(self.config.get_downloads_path())
         self.database_path.setText(self.config.get_database_path())
         self.backup_path.setText(self.config.get_backup_path())
+        self.xlsm_path.setText(self.config.get_xlsm_path())
 
     def browse_folder(self, path_type):
-        if path_type in ['downloads', 'backup']:
-            title = "ダウンロードフォルダの選択" if path_type == 'downloads' else "バックアップフォルダの選択"
-            path_field = self.downloads_path if path_type == 'downloads' else self.backup_path
+        folders = {
+            'downloads': ("ダウンロードフォルダの選択", self.downloads_path),
+            'backup': ("バックアップフォルダの選択", self.backup_path),
+            'xlsm': ("xlsmフォルダの選択", self.xlsm_path),
+        }
+        if path_type in folders:
+            title, path_field = folders[path_type]
 
             folder = QFileDialog.getExistingDirectory(
                 self,
@@ -260,6 +271,7 @@ class FolderPathDialog(QDialog):
         self.config.set_downloads_path(self.downloads_path.text())
         self.config.set_database_path(self.database_path.text())
         self.config.set_backup_path(self.backup_path.text())
+        self.config.set_xlsm_path(self.xlsm_path.text())
         super().accept()
 
 

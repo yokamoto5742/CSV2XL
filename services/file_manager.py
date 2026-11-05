@@ -23,6 +23,14 @@ def backup_database(connection: sqlite3.Connection) -> Path:
     return backup_path
 
 
+def backup_database_daily(connection: sqlite3.Connection) -> Path | None:
+    """その日のバックアップがまだ無ければ作成し、そのパスを返す。作成済みなら None を返す"""
+    backup_dir = Path(ConfigManager().get_backup_path())
+    if any(backup_dir.glob(f"医療文書担当一覧_{datetime.date.today():%Y%m%d}*.db")):
+        return None
+    return backup_database(connection)
+
+
 def cleanup_old_csv_files(processed_dir: Path) -> None:
     """指定した日数より前の処理済みCSVファイルを削除
 

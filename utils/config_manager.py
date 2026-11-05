@@ -80,6 +80,13 @@ class ConfigManager:
     def set_backup_path(self, path: str) -> None:
         self._set('Paths', {'backup_path': path})
 
+    def get_xlsm_path(self) -> str:
+        """医療文書担当一覧_YYYYMMDDhhmm.xlsm を置くフォルダ"""
+        return self.config.get('Paths', 'xlsm_path', fallback=str(DEFAULT_BASE_DIR))
+
+    def set_xlsm_path(self, path: str) -> None:
+        self._set('Paths', {'xlsm_path': path})
+
     def get_processed_path(self) -> str:
         return self.config.get('Paths', 'processed_path', fallback=str(DEFAULT_BASE_DIR / "processed"))
 

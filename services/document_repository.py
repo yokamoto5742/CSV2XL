@@ -28,6 +28,15 @@ class NewDocument:
 
 
 @dataclass(frozen=True)
+class ImportedDocument:
+    """xlsm から取り込む行(A〜I 列)"""
+    new_document: NewDocument
+    staff_name: str | None
+    requested_date: str | None
+    note: str | None
+
+
+@dataclass(frozen=True)
 class Document:
     """担当一覧の1行"""
     id: int
@@ -89,6 +98,48 @@ class DocumentRepository:
             new_documents = [doc for doc in documents if doc.key() not in existing_keys]
             self.connection.executemany(INSERT_SQL, [(*doc.key(), now, now) for doc in new_documents])
         return len(new_documents)
+
+    def merge_documents(self, documents: list[ImportedDocument]) -> tuple[int, int]:
+        """xlsm の行を取り込み、(追加した件数, 空欄を埋めた件数) を返す
+
+        A〜F 列が同じ既存行とは登録順に1対1で対応させ、既存行の担当者名・医師依頼日・備考の空欄だけを埋める。
+        対応する既存行が無ければ新しい行として追加する。削除済みの行は埋めない(行も戻さない)
+        """
+        now = now_text()
+        added_count = 0
+        updated_count = 0
+        with self.connection:
+            # 別端末の同時取り込みで重複しないよう、読み込みの前に書き込みロックを取る
+            self.connection.execute('BEGIN IMMEDIATE')
+            existing_rows: dict[tuple, list[sqlite3.Row]] = {}
+            for row in self.connection.execute(
+                "SELECT id, received_date, patient_id, patient_name, document_name, department, doctor_name,"
+                " staff_name, requested_date, note, deleted FROM documents ORDER BY id"
+            ):
+                existing_rows.setdefault(tuple(row)[1:7], []).append(row)
+
+            for document in documents:
+                matches = existing_rows.get(document.new_document.key())
+                if not matches:
+                    self.connection.execute(
+                        "INSERT INTO documents (received_date, patient_id, patient_name, document_name, department,"
+                        " doctor_name, staff_name, requested_date, note, created_at, updated_at)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (*document.new_document.key(), document.staff_name, document.requested_date,
+                         document.note, now, now))
+                    added_count += 1
+                    continue
+                row = matches.pop(0)
+                filled = (row['staff_name'] or document.staff_name, row['requested_date'] or document.requested_date,
+                          row['note'] or document.note)
+                if row['deleted'] or filled == (row['staff_name'], row['requested_date'], row['note']):
+                    continue
+                self.connection.execute(
+                    "UPDATE documents SET staff_name = ?, requested_date = ?, note = ?,"
+                    " version = version + 1, updated_at = ? WHERE id = ?",
+                    (*filled, now, row['id']))
+                updated_count += 1
+        return added_count, updated_count
 
     def update_editable_fields(self, document: Document) -> Document | None:
         """担当者名・医師依頼日・備考を保存する

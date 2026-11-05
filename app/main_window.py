@@ -3,7 +3,7 @@ import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
@@ -17,8 +17,9 @@ from app.document_window import DocumentListWidget
 from utils.config_manager import ConfigManager
 from services.csv_import import import_csv_to_database
 from services.database import connect
-from services.file_manager import cleanup_old_backup_files
+from services.file_manager import backup_database_daily, cleanup_old_backup_files
 from services.list_repository import ListRepository
+from services.xlsm_import import import_xlsm_to_database
 from app import __version__
 
 CSV_BUTTON_STYLE = """
@@ -39,6 +40,10 @@ CSV_BUTTON_STYLE = """
 """
 SECTION_SPACING = 12
 MAX_TABLE_WIDTH = 10000
+# ボタンの文字の左右に取る余白(CSV_BUTTON_STYLE の padding と border を含む)
+BUTTON_TEXT_PADDING = 24
+# 取り込めなかった行の一覧に出す最大の行数
+MAX_ERROR_LINES = 50
 
 
 def apply_app_font_size(point_size: int) -> None:
@@ -48,8 +53,16 @@ def apply_app_font_size(point_size: int) -> None:
     QApplication.setFont(font)
 
 
+class CompactButton(QPushButton):
+    """Windows の既定の最小幅(約80px)より狭くできるボタン。左パネルを文字の幅まで狭くするために使う"""
+
+    def sizeHint(self) -> QSize:
+        width = self.fontMetrics().horizontalAdvance(self.text()) + BUTTON_TEXT_PADDING
+        return QSize(width, super().sizeHint().height())
+
+
 def add_button(layout: QVBoxLayout | QHBoxLayout, text: str, slot: Callable[[], object]) -> QPushButton:
-    button = QPushButton(text)
+    button = CompactButton(text)
     button.clicked.connect(slot)
     layout.addWidget(button)
     return button
@@ -77,17 +90,16 @@ class MainWindow(QMainWindow):
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
         side_panel = QWidget()
-        side_panel.setLayout(self.create_side_panel(title))
+        side_panel.setLayout(self.create_side_panel())
         self.splitter.addWidget(side_panel)
         self.setCentralWidget(self.splitter)
         self.side_panel_width = self.config.get_side_panel_width()
 
         self.open_document_list()
+        self.backup_daily()
 
-    def create_side_panel(self, title: str) -> QVBoxLayout:
+    def create_side_panel(self) -> QVBoxLayout:
         panel = QVBoxLayout()
-        panel.addWidget(QLabel(title))
-        panel.addSpacing(SECTION_SPACING)
         self.add_search_section(panel)
         panel.addSpacing(SECTION_SPACING)
 
@@ -96,6 +108,7 @@ class MainWindow(QMainWindow):
         panel.addSpacing(SECTION_SPACING)
 
         panel.addWidget(QLabel("データ"))
+        add_button(panel, "xlsm取り込み", self.import_xlsm)
         add_button(panel, "行の追加", self.add_document)
         add_button(panel, "行の削除", self.delete_document)
         add_button(panel, "CSV出力", self.export_csv)
@@ -119,10 +132,13 @@ class MainWindow(QMainWindow):
         panel.addWidget(QLabel("患者ID検索"))
         self.patient_id_input = QLineEdit()
         self.patient_id_input.returnPressed.connect(self.search)
-        panel.addWidget(self.patient_id_input)
+        # 左パネルを狭くするため、ボタンを入力欄の横と次の行に分ける
+        search_input = QHBoxLayout()
+        search_input.addWidget(self.patient_id_input)
+        add_button(search_input, "検索", self.search)
+        panel.addLayout(search_input)
 
         search_buttons = QHBoxLayout()
-        add_button(search_buttons, "検索", self.search)
         add_button(search_buttons, "前へ", self.show_previous_hit)
         add_button(search_buttons, "次へ", self.show_next_hit)
         panel.addLayout(search_buttons)
@@ -185,6 +201,29 @@ class MainWindow(QMainWindow):
             return
         QMessageBox.information(self, "取り込み完了", f"{added_count}件を追加しました。")
         self.open_document_list()
+
+    def import_xlsm(self) -> None:
+        try:
+            result = import_xlsm_to_database(self.get_connection())
+        except Exception as e:
+            QMessageBox.critical(self, "エラー", f"xlsmファイルの取り込み中にエラーが発生しました:\n{str(e)}")
+            return
+        message = f"{result.file_name}\n{result.added_count}件を追加し、{result.updated_count}件の空欄を埋めました。"
+        if result.errors:
+            message += f"\n\n取り込めなかった行({len(result.errors)}件):\n" + "\n".join(result.errors[:MAX_ERROR_LINES])
+            if len(result.errors) > MAX_ERROR_LINES:
+                message += "\n…"
+        QMessageBox.information(self, "取り込み完了", message)
+        self.open_document_list()
+
+    def backup_daily(self) -> None:
+        """起動時に、その日のバックアップがまだ無ければ作る"""
+        if self.connection is None:
+            return
+        try:
+            backup_database_daily(self.connection)
+        except Exception as e:
+            QMessageBox.warning(self, "警告", f"データベースのバックアップに失敗しました:\n{str(e)}")
 
     def add_document(self) -> None:
         if self.document_widget is None:

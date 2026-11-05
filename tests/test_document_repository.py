@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from services.database import connect
-from services.document_repository import DocumentRepository
+from services.document_repository import DocumentRepository, ImportedDocument
 from tests.conftest import make_new_document
 
 
@@ -39,6 +39,61 @@ class TestAddNewDocuments:
 
     def test_empty_list(self, connection: sqlite3.Connection) -> None:
         assert DocumentRepository(connection).add_new_documents([]) == 0
+
+
+class TestMergeDocuments:
+    def test_adds_new_document_with_editable_fields(self, connection: sqlite3.Connection) -> None:
+        repository = DocumentRepository(connection)
+
+        counts = repository.merge_documents([ImportedDocument(make_new_document(1), '山本', '2025-01-15', '至急')])
+
+        document = repository.fetch_all()[0]
+        assert counts == (1, 0)
+        assert (document.staff_name, document.requested_date, document.note) == ('山本', '2025-01-15', '至急')
+
+    def test_fills_only_blank_fields(self, connection: sqlite3.Connection) -> None:
+        """既存行の空欄だけを埋め、入力済みの値は上書きしない"""
+        repository = DocumentRepository(connection)
+        repository.add_new_documents([make_new_document(1)])
+        existing = repository.fetch_all()[0]
+        repository.update_editable_fields(dataclasses.replace(existing, staff_name='植田'))
+
+        counts = repository.merge_documents([ImportedDocument(make_new_document(1), '山本', '2025-01-15', None)])
+
+        document = repository.fetch_all()[0]
+        assert counts == (0, 1)
+        assert (document.staff_name, document.requested_date, document.note) == ('植田', '2025-01-15', None)
+        assert document.version == 3
+
+    def test_skips_duplicate_without_new_values(self, connection: sqlite3.Connection) -> None:
+        repository = DocumentRepository(connection)
+        repository.add_new_documents([make_new_document(1)])
+
+        counts = repository.merge_documents([ImportedDocument(make_new_document(1), None, None, None)])
+
+        assert counts == (0, 0)
+        assert repository.fetch_all()[0].version == 1
+
+    def test_pairs_same_key_rows_in_order(self, connection: sqlite3.Connection) -> None:
+        """A〜F 列が同じ行は登録順に1対1で対応させ、余った行は追加する"""
+        repository = DocumentRepository(connection)
+        repository.add_new_documents([make_new_document(1)])
+
+        counts = repository.merge_documents([ImportedDocument(make_new_document(1), '山本', None, None),
+                                             ImportedDocument(make_new_document(1), '植田', None, None)])
+
+        assert counts == (1, 1)
+        assert [doc.staff_name for doc in repository.fetch_all()] == ['山本', '植田']
+
+    def test_does_not_restore_deleted_document(self, connection: sqlite3.Connection) -> None:
+        repository = DocumentRepository(connection)
+        repository.add_new_documents([make_new_document(1)])
+        repository.delete_document(repository.fetch_all()[0])
+
+        counts = repository.merge_documents([ImportedDocument(make_new_document(1), '山本', None, None)])
+
+        assert counts == (0, 0)
+        assert repository.fetch_all() == []
 
 
 class TestUpdateEditableFields:

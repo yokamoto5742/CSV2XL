@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from services.file_manager import backup_database, cleanup_old_csv_files, ensure_directories_exist
+from services.file_manager import backup_database, backup_database_daily, cleanup_old_csv_files, ensure_directories_exist
 
 
 class TestFileManager:
@@ -23,6 +23,18 @@ class TestFileManager:
         assert backup_path.name.startswith('医療文書担当一覧_') and backup_path.suffix == '.db'
         with closing(sqlite3.connect(backup_path)) as backup_connection:
             assert backup_connection.execute("SELECT name FROM list_items").fetchone()[0] == '山本'
+
+    @patch('services.file_manager.ConfigManager')
+    def test_backup_database_daily(self, mock_config_manager, connection: sqlite3.Connection, tmp_path: Path):
+        """その日のバックアップが無いときだけ作成する"""
+        backup_dir = tmp_path / 'backup'
+        backup_dir.mkdir()
+        mock_config_manager.return_value.get_backup_path.return_value = str(backup_dir)
+        (backup_dir / '医療文書担当一覧_200001010000.db').touch()
+
+        assert backup_database_daily(connection) is not None
+        assert backup_database_daily(connection) is None
+        assert len(list(backup_dir.glob('*.db'))) == 2
 
     @patch('services.file_manager.ConfigManager')
     @patch('services.file_manager.datetime.datetime')

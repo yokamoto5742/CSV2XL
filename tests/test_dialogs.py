@@ -249,6 +249,15 @@ class TestFolderPathDialog:
         mock_get_dir.assert_called_once()
         assert dialog.backup_path.text() == 'C:\\New\\Backup'
 
+    @patch('app.dialogs.QFileDialog.getExistingDirectory')
+    def test_browse_folder_xlsm(self, mock_get_dir, app, backup_config):
+        mock_get_dir.return_value = 'C:\\New\\Xlsm'
+
+        dialog = FolderPathDialog()
+        dialog.browse_folder('xlsm')
+
+        assert dialog.xlsm_path.text() == 'C:\\New\\Xlsm'
+
     @patch('app.dialogs.QFileDialog.getSaveFileName')
     def test_browse_folder_database(self, mock_get_file, app, backup_config):
         """データベースファイルブラウズ機能のテスト"""
@@ -292,6 +301,7 @@ class TestFolderPathDialog:
         dialog.downloads_path.setText('C:\\New\\Downloads')
         dialog.database_path.setText('C:\\New\\DB\\new.db')
         dialog.backup_path.setText('C:\\New\\Backup')
+        dialog.xlsm_path.setText('C:\\New\\Xlsm')
 
         # モック化したsuperクラスのacceptメソッドでテスト
         with patch.object(QDialog, 'accept') as mock_accept:
@@ -303,6 +313,7 @@ class TestFolderPathDialog:
         assert config.get_downloads_path() == 'C:\\New\\Downloads'
         assert config.get_database_path() == 'C:\\New\\DB\\new.db'
         assert config.get_backup_path() == 'C:\\New\\Backup'
+        assert config.get_xlsm_path() == 'C:\\New\\Xlsm'
 
 
 class TestAppearanceDialog:

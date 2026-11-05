@@ -4,9 +4,10 @@ import configparser
 from unittest.mock import patch, MagicMock
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QApplication, QPushButton, QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QPushButton, QWidget
 
 from app.main_window import MainWindow
+from services.xlsm_import import XlsmImportResult
 from utils.config_manager import ConfigManager, CONFIG_PATH
 from app import __version__
 
@@ -76,7 +77,8 @@ class FakeDocumentListWidget(QWidget):
 def db_connect():
     """本物の DB に接続しないよう connect と担当一覧をモックする"""
     with patch('app.main_window.connect') as mock_connect, \
-            patch('app.main_window.DocumentListWidget', FakeDocumentListWidget):
+            patch('app.main_window.DocumentListWidget', FakeDocumentListWidget), \
+            patch('app.main_window.backup_database_daily'):
         yield mock_connect
 
 
@@ -108,7 +110,8 @@ class TestMainWindow:
         assert window.splitter.indexOf(document_widget) == 1
         assert QApplication.font().pointSize() == ConfigManager().get_font_size()
 
-        for text in ("検索", "前へ", "次へ", "CSV取り込み", "行の追加", "行の削除", "CSV出力", "文書名", "医師名",
+        assert all(__version__ not in label.text() for label in window.findChildren(QLabel))
+        for text in ("検索", "前へ", "次へ", "CSV取り込み", "xlsm取り込み", "行の追加", "行の削除", "CSV出力", "文書名", "医師名",
                      "担当者名", "画面サイズ", "フォルダパス", "閉じる"):
             find_button(window, text)
 
@@ -133,6 +136,43 @@ class TestMainWindow:
         mock_import.assert_called_once_with(db_connect.return_value)
         assert "3件" in mock_info.call_args[0][2]
         fake_widget(window).reload.assert_called_once()
+
+    @patch('app.main_window.QMessageBox.information')
+    @patch('app.main_window.import_xlsm_to_database')
+    def test_import_xlsm_success(self, mock_import, mock_info, app, backup_config, db_connect):
+        """xlsm 取り込み後は件数と取り込めなかった行を表示して担当一覧を読み直す"""
+        mock_import.return_value = XlsmImportResult('医療文書担当一覧_202501101200.xlsm', 3, 2, ['5行目: 預り日が空です'])
+        window = MainWindow()
+
+        window.import_xlsm()
+
+        mock_import.assert_called_once_with(db_connect.return_value)
+        message = mock_info.call_args[0][2]
+        assert "3件を追加し、2件の空欄を埋めました" in message
+        assert "5行目: 預り日が空です" in message
+        fake_widget(window).reload.assert_called_once()
+
+    @patch('app.main_window.import_xlsm_to_database', side_effect=FileNotFoundError("xlsmなし"))
+    @patch('app.main_window.QMessageBox.critical')
+    def test_import_xlsm_error(self, mock_critical, mock_import, app, backup_config, db_connect):
+        window = MainWindow()
+
+        window.import_xlsm()
+
+        assert "xlsmなし" in mock_critical.call_args[0][2]
+
+    def test_backup_daily_on_startup(self, app, backup_config, db_connect):
+        with patch('app.main_window.backup_database_daily') as mock_backup:
+            MainWindow()
+
+        mock_backup.assert_called_once_with(db_connect.return_value)
+
+    @patch('app.main_window.QMessageBox.warning')
+    def test_backup_daily_error(self, mock_warning, app, backup_config, db_connect):
+        with patch('app.main_window.backup_database_daily', side_effect=OSError("書き込み不可")):
+            MainWindow()
+
+        assert "書き込み不可" in mock_warning.call_args[0][2]
 
     @patch('app.main_window.import_csv_to_database')
     @patch('app.main_window.QMessageBox.critical')
