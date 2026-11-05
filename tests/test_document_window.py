@@ -5,8 +5,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtCore import QDate, QModelIndex
-from PyQt6.QtWidgets import QApplication, QComboBox, QDateEdit, QMessageBox, QStyleOptionViewItem
+from PyQt6.QtCore import QDate, QModelIndex, QPoint
+from PyQt6.QtWidgets import (
+    QAbstractItemView, QApplication, QComboBox, QDateEdit, QMessageBox, QStyleOptionViewItem
+)
 
 from app.document_table_model import REQUESTED_DATE_COLUMN, STAFF_COLUMN
 from app.document_window import ROW_PADDING, DocumentListWidget, RequestedDateDelegate, StaffComboDelegate
@@ -266,6 +268,91 @@ class TestExportCsv:
         lines = path.read_text(encoding='utf-8-sig').splitlines()
         assert lines[0] == '預り日,患者ID,患者名,文書名,診療科,医師名,担当者名,医師依頼日,備考'
         assert [line.split(',')[0] for line in lines[1:]] == ['2025/01/10', '2025/01/11', '2025/01/12']
+
+
+class TestDetailDialog:
+    @patch('app.document_window.DocumentDetailDialog')
+    def test_double_click_saves_edits(self, mock_dialog, window: DocumentListWidget):
+        """ダブルクリックで詳細ダイアログを開き、OK なら編集した値を保存する"""
+        target = window.model.document(1)
+        mock_dialog.return_value.exec.return_value = 1
+        mock_dialog.return_value.edited_document.return_value = dataclasses.replace(target, note='確認済み')
+
+        window.table.doubleClicked.emit(window.model.index(1, 3))
+
+        assert mock_dialog.call_args[0][:2] == (target, ['山本', '植田'])
+        assert window.model.document(1).note == '確認済み'
+
+    @patch('app.document_window.DocumentDetailDialog')
+    def test_cancel_does_not_save(self, mock_dialog, window: DocumentListWidget):
+        mock_dialog.return_value.exec.return_value = 0
+
+        with patch.object(window.model, 'save_document') as mock_save:
+            window.show_detail(window.model.index(0, 0))
+
+        mock_save.assert_not_called()
+
+    def test_double_click_does_not_start_inline_edit(self, window: DocumentListWidget):
+        triggers = window.table.editTriggers()
+        assert not triggers & QAbstractItemView.EditTrigger.DoubleClicked
+        assert triggers & QAbstractItemView.EditTrigger.EditKeyPressed
+
+
+def test_copy_cell(window: DocumentListWidget):
+    window.copy_cell(window.model.index(0, 2))
+
+    clipboard = QApplication.clipboard()
+    assert clipboard is not None
+    assert clipboard.text() == '山田　太郎'
+
+
+class TestColumnFilter:
+    @patch('app.document_window.ColumnFilterDialog')
+    def test_header_right_click_filters(self, mock_dialog, window: DocumentListWidget):
+        mock_dialog.return_value.exec.return_value = 1
+        mock_dialog.return_value.selected_values.return_value = {'100'}
+        header = window.table.horizontalHeader()
+        assert header is not None
+        window.resize(1200, 400)
+        position = QPoint(header.sectionViewportPosition(1) + 5, 5)
+
+        window.show_column_filter(position)
+
+        assert mock_dialog.call_args[0][:3] == ('患者ID', ['100', '200'], None)
+        assert window.model.rowCount() == 2
+        assert window.model.filters == {1: {'100'}}
+
+    @patch('app.document_window.ColumnFilterDialog')
+    def test_cancel_keeps_filter(self, mock_dialog, window: DocumentListWidget):
+        mock_dialog.return_value.exec.return_value = 0
+
+        window.show_column_filter(QPoint(5, 5))
+
+        assert window.model.rowCount() == 3
+
+    def test_search_only_visible_rows(self, window: DocumentListWidget, statuses: list[str]):
+        window.model.set_filter(0, {'2025/01/12'})
+
+        window.search('100')
+
+        assert statuses[-1] == "1/1件"
+
+    def test_export_only_visible_rows(self, window: DocumentListWidget, tmp_path: Path):
+        window.model.set_filter(1, {'200'})
+        path = tmp_path / 'export.csv'
+
+        window.export_csv(str(path))
+
+        assert len(path.read_text(encoding='utf-8-sig').splitlines()) == 2
+
+    def test_add_document_while_hidden_by_filter(self, window: DocumentListWidget):
+        """追加した行がフィルタで隠れても、エラーにならない"""
+        window.model.set_filter(1, {'100'})
+
+        window.add_document(make_new_document(999, '2025-01-01'))
+
+        assert len(window.model.all_documents) == 4
+        assert window.model.rowCount() == 2
 
 
 def test_apply_font_size_sets_row_height(window: DocumentListWidget):

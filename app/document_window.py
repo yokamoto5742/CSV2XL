@@ -1,12 +1,13 @@
 import sqlite3
 
-from PyQt6.QtCore import QAbstractItemModel, QDate, QModelIndex, QPersistentModelIndex, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QAbstractItemModel, QDate, QModelIndex, QPersistentModelIndex, QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QAbstractItemView, QComboBox, QDateEdit, QMessageBox, QStyledItemDelegate, QStyleOptionViewItem,
-    QTableView, QVBoxLayout, QWidget
+    QAbstractItemView, QApplication, QComboBox, QDateEdit, QMenu, QMessageBox, QStyledItemDelegate,
+    QStyleOptionViewItem, QTableView, QVBoxLayout, QWidget
 )
 
+from app.dialogs import DISPLAY_DATE_FORMAT, ColumnFilterDialog, DocumentDetailDialog, create_date_edit
 from app.document_table_model import COLUMNS, REQUESTED_DATE_COLUMN, STAFF_COLUMN, DocumentTableModel
 from services.csv_export import write_csv
 from services.document_repository import DocumentRepository, NewDocument
@@ -16,17 +17,8 @@ from services.validators import parse_patient_id
 # Excel 版の列幅に近い値(ピクセル)
 COLUMN_WIDTHS = [100, 80, 120, 320, 120, 100, 100, 110, 260]
 AUTO_REFRESH_INTERVAL_MS = 5000
-DISPLAY_DATE_FORMAT = 'yyyy/MM/dd'
 # 行の高さ = 文字の高さ + 上下の余白(ピクセル)
 ROW_PADDING = 8
-
-
-def create_date_edit(parent: QWidget | None = None) -> QDateEdit:
-    """▼でカレンダーを開ける日付欄"""
-    date_edit = QDateEdit(parent)
-    date_edit.setCalendarPopup(True)
-    date_edit.setDisplayFormat(DISPLAY_DATE_FORMAT)
-    return date_edit
 
 
 class CommitOnSelectDelegate(QStyledItemDelegate):
@@ -139,15 +131,21 @@ class DocumentListWidget(QWidget):
         clear_shortcut.activated.connect(self.clear_requested_date)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked
-                              | QAbstractItemView.EditTrigger.EditKeyPressed
+        # ダブルクリックは詳細ダイアログを開くため、セルの直接編集は F2 キーと文字の入力だけにする
+        table.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed
                               | QAbstractItemView.EditTrigger.AnyKeyPressed)
+        table.doubleClicked.connect(self.show_detail)
+        table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        table.customContextMenuRequested.connect(self.show_cell_menu)
         table.setAlternatingRowColors(True)
         header = table.horizontalHeader()
         if header is not None:
             # 起動直後は既定の並び(預り日 → 診療科 → 患者ID)にするため、並び替えの列を未選択にしておく
             header.setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
             header.setStretchLastSection(True)
+            # 見出しの左クリックは並び替え、右クリックはフィルタ
+            header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            header.customContextMenuRequested.connect(self.show_column_filter)
         table.setSortingEnabled(True)
         for column, width in enumerate(COLUMN_WIDTHS):
             table.setColumnWidth(column, width)
@@ -239,7 +237,8 @@ class DocumentListWidget(QWidget):
             self.show_error(f"行の追加に失敗しました。\n{e}")
             return
         self.reload()
-        new_id = max(doc.id for doc in self.model.documents)
+        # フィルタで隠れた行も含めて、いちばん新しい行を探す
+        new_id = max(doc.id for doc in self.model.all_documents)
         row = self.model.find_row_by_id(new_id)
         if row is not None:
             self.table.selectRow(row)
@@ -268,8 +267,49 @@ class DocumentListWidget(QWidget):
             return
         self.reload()
 
+    def show_detail(self, index: QModelIndex) -> None:
+        """行の全項目をダイアログで表示し、OK なら担当者名・医師依頼日・備考を保存する"""
+        if not index.isValid():
+            return
+        document = self.model.document(index.row())
+        dialog = DocumentDetailDialog(document, self.staff_names, self)
+        if not dialog.exec():
+            return
+        edited = dialog.edited_document()
+        if edited != document:
+            self.model.save_document(edited)
+
+    def show_cell_menu(self, position: QPoint) -> None:
+        index = self.table.indexAt(position)
+        if not index.isValid():
+            return
+        menu = QMenu(self)
+        copy_action = menu.addAction("コピー")
+        viewport = self.table.viewport()
+        if viewport is not None and menu.exec(viewport.mapToGlobal(position)) is copy_action:
+            self.copy_cell(index)
+
+    def copy_cell(self, index: QModelIndex) -> None:
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(str(index.data() or ''))
+
+    def show_column_filter(self, position: QPoint) -> None:
+        """見出しを右クリックした列の値を選んで絞り込む"""
+        header = self.table.horizontalHeader()
+        if header is None:
+            return
+        column = header.logicalIndexAt(position)
+        if column < 0:
+            return
+        dialog = ColumnFilterDialog(COLUMNS[column][0], self.model.column_values(column),
+                                    self.model.filters.get(column), self)
+        dialog.move(header.mapToGlobal(position))
+        if dialog.exec():
+            self.model.set_filter(column, dialog.selected_values())
+
     def export_csv(self, path: str) -> None:
-        """画面の並び順のまま CSV に書き出す。失敗時は OSError"""
+        """表示中の行を画面の並び順のまま CSV に書き出す。失敗時は OSError"""
         write_csv(path, [heading for heading, _ in COLUMNS], self.model.export_rows())
 
     def show_error(self, message: str) -> None:

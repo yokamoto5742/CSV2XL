@@ -3,15 +3,15 @@ import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QCloseEvent
+from PyQt6.QtCore import QPoint, QSize, Qt
+from PyQt6.QtGui import QCloseEvent, QGuiApplication
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QPushButton, QLabel, QLineEdit, QMessageBox, QFileDialog, QSplitter
 )
 
 from app.dialogs import (
-    AddDocumentDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, StaffNamesDialog, AppearanceDialog, FolderPathDialog
+    AddDocumentDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, StaffNamesDialog, FolderPathDialog, SettingsDialog
 )
 from app.document_window import DocumentListWidget
 from utils.config_manager import ConfigManager
@@ -80,8 +80,7 @@ class MainWindow(QMainWindow):
         cleanup_old_backup_files()
 
         apply_app_font_size(self.config.get_font_size())
-        # 最大化して起動するときは、この大きさを最大化を解除したときに使う
-        self.resize(*self.config.get_window_size())
+        self.restore_window_geometry()
         title = f"医療文書担当一覧 v{__version__}"
         self.setWindowTitle(title)
         self.setStyleSheet("QMainWindow { border: 5px solid darkgreen; }")
@@ -108,10 +107,8 @@ class MainWindow(QMainWindow):
         panel.addSpacing(SECTION_SPACING)
 
         panel.addWidget(QLabel("データ"))
-        add_button(panel, "xlsm取り込み", self.import_xlsm)
         add_button(panel, "行の追加", self.add_document)
         add_button(panel, "行の削除", self.delete_document)
-        add_button(panel, "CSV出力", self.export_csv)
         panel.addSpacing(SECTION_SPACING)
 
         panel.addWidget(QLabel("除外項目"))
@@ -120,8 +117,7 @@ class MainWindow(QMainWindow):
         panel.addSpacing(SECTION_SPACING)
 
         add_button(panel, "担当者名", self.show_staff_names_dialog)
-        add_button(panel, "画面サイズ", self.show_appearance_dialog)
-        add_button(panel, "フォルダパス", self.show_folder_path_dialog)
+        add_button(panel, "設定", self.show_settings_dialog)
         panel.addSpacing(SECTION_SPACING)
 
         add_button(panel, "閉じる", self.close)
@@ -271,19 +267,26 @@ class MainWindow(QMainWindow):
         if self.document_widget is not None:
             self.document_widget.reload()
 
-    def show_appearance_dialog(self) -> None:
-        dialog = AppearanceDialog(self)
-        if dialog.exec():
-            self.apply_appearance()
+    def show_settings_dialog(self) -> None:
+        dialog = SettingsDialog([
+            ("xlsm取り込み", self.import_xlsm),
+            ("CSV出力", self.export_csv),
+            ("フォルダパス", self.show_folder_path_dialog),
+        ], self)
+        dialog.exec()
 
-    def apply_appearance(self) -> None:
-        """保存した外観の設定を再起動せずに反映する"""
-        self.config = ConfigManager()
-        apply_app_font_size(self.config.get_font_size())
-        if self.document_widget is not None:
-            self.document_widget.apply_font_size()
-        if not self.isMaximized():
-            self.resize(*self.config.get_window_size())
+    def restore_window_geometry(self) -> None:
+        """前回終了時の位置と大きさにする。その位置がどの画面にも入らなければ、大きさだけを戻す"""
+        self.resize(*self.config.get_window_size())
+        position = self.config.get_window_position()
+        if position is not None and QGuiApplication.screenAt(QPoint(*position)) is not None:
+            self.setGeometry(*position, self.width(), self.height())
+
+    def save_window_geometry(self) -> None:
+        # 最大化しているときは、最大化を解除したときの位置と大きさを保存する
+        maximized = self.isMaximized()
+        rect = self.normalGeometry() if maximized else self.geometry()
+        self.config.set_window_geometry(rect.x(), rect.y(), rect.width(), rect.height(), maximized)
 
     def show_folder_path_dialog(self) -> None:
         dialog = FolderPathDialog(self)
@@ -294,5 +297,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent | None) -> None:
         self.close_connection()
+        # フォルダパスのダイアログが保存した値を古い内容で上書きしないよう、読み直してから保存する
+        self.config = ConfigManager()
         self.config.set_side_panel_width(self.side_panel_width)
+        self.save_window_geometry()
         super().closeEvent(event)

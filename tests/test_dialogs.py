@@ -1,16 +1,16 @@
 import sys
 import pytest
 import configparser
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from PyQt6.QtCore import QDate
-from PyQt6.QtWidgets import QApplication, QDialog, QListWidget
+from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtWidgets import QApplication, QDialog, QListWidget, QPushButton
 
 from app.dialogs import (
-    AddDocumentDialog, AppearanceDialog, ExcludeDocsDialog, ExcludeDoctorsDialog, FolderPathDialog, ListItemDialog,
-    StaffNamesDialog
+    AddDocumentDialog, ColumnFilterDialog, DocumentDetailDialog, ExcludeDocsDialog, ExcludeDoctorsDialog,
+    FolderPathDialog, ListItemDialog, SettingsDialog, StaffNamesDialog
 )
-from services.document_repository import NewDocument
+from services.document_repository import Document, NewDocument
 from services.list_repository import EXCLUDE_DOCS, EXCLUDE_DOCTORS, STAFF, ListRepository
 from utils.config_manager import ConfigManager, CONFIG_PATH
 
@@ -140,29 +140,39 @@ class TestListDialogSubclasses:
         assert dialog.category == category
 
 
-class TestStaffNamesDialog:
-    def test_load_from_config(self, app, list_repository):
-        """config の担当者名で一覧を置き換え、OK で DB に保存する"""
-        list_repository.set_items(STAFF, ['旧担当'])
-        dialog = StaffNamesDialog(list_repository)
+CONFIG_LIST_DIALOGS = [
+    (StaffNamesDialog, STAFF, 'get_staff_names', "[Staff] ordered_names"),
+    (ExcludeDocsDialog, EXCLUDE_DOCS, 'get_exclude_docs', "[ExcludeDocs] list"),
+    (ExcludeDoctorsDialog, EXCLUDE_DOCTORS, 'get_exclude_doctors', "[ExcludeDoctors] list"),
+]
 
-        with patch.object(ConfigManager, 'get_staff_names', return_value=['植田', '花﨑']):
+
+class TestLoadFromConfig:
+    @pytest.mark.parametrize("dialog_class, category, getter, config_key", CONFIG_LIST_DIALOGS)
+    def test_load_from_config(self, app, list_repository, dialog_class, category, getter, config_key):
+        """config のリストで一覧を置き換え、OK で DB に保存する"""
+        list_repository.set_items(category, ['旧項目'])
+        dialog = dialog_class(list_repository)
+
+        with patch.object(ConfigManager, getter, return_value=['植田', '花﨑']):
             dialog.load_from_config()
         with patch.object(QDialog, 'accept'):
             dialog.accept()
 
-        assert list_repository.get_items(STAFF) == ['植田', '花﨑']
+        assert list_repository.get_items(category) == ['植田', '花﨑']
 
+    @pytest.mark.parametrize("dialog_class, category, getter, config_key", CONFIG_LIST_DIALOGS)
     @patch('app.dialogs.QMessageBox.warning')
-    def test_load_from_config_empty(self, mock_warning, app, list_repository):
-        """config に担当者名が無ければ警告し、一覧はそのまま"""
-        list_repository.set_items(STAFF, ['山本'])
-        dialog = StaffNamesDialog(list_repository)
+    def test_load_from_config_empty(self, mock_warning, app, list_repository, dialog_class, category, getter,
+                                    config_key):
+        """config のリストが空なら警告し、一覧はそのまま"""
+        list_repository.set_items(category, ['山本'])
+        dialog = dialog_class(list_repository)
 
-        with patch.object(ConfigManager, 'get_staff_names', return_value=[]):
+        with patch.object(ConfigManager, getter, return_value=[]):
             dialog.load_from_config()
 
-        mock_warning.assert_called_once()
+        assert config_key in mock_warning.call_args[0][2]
         assert dialog.item_list.count() == 1
 
 
@@ -316,67 +326,97 @@ class TestFolderPathDialog:
         assert config.get_xlsm_path() == 'C:\\New\\Xlsm'
 
 
-class TestAppearanceDialog:
-    def test_init(self, app, backup_config):
-        """AppearanceDialogの初期化テスト"""
-        dialog = AppearanceDialog()
-        assert dialog.windowTitle() == "フォントとウインドウサイズ"
-        assert dialog.font_size_input is not None
-        assert dialog.window_width_input is not None
-        assert dialog.window_height_input is not None
+class TestSettingsDialog:
+    def test_button_closes_dialog_then_runs_action(self, app):
+        action = MagicMock()
+        dialog = SettingsDialog([("xlsm取り込み", action), ("CSV出力", MagicMock())])
+        button = next(b for b in dialog.findChildren(QPushButton) if b.text() == "xlsm取り込み")
 
-    def test_load_settings(self, app, backup_config):
-        """設定読み込み機能のテスト"""
-        # 設定ファイルにテスト用サイズを設定
-        config = ConfigManager()
-        if 'Appearance' not in config.config:
-            config.config['Appearance'] = {}
-        config.config['Appearance']['font_size'] = '14'
-        config.config['Appearance']['window_width'] = '400'
-        config.config['Appearance']['window_height'] = '300'
-        config.save_config()
-
-        # ダイアログを初期化して設定が読み込まれるか確認
-        dialog = AppearanceDialog()
-
-        assert dialog.font_size_input.text() == '14'
-        assert dialog.window_width_input.text() == '400'
-        assert dialog.window_height_input.text() == '300'
-
-    def test_accept(self, app, backup_config):
-        """ダイアログ確定時の設定保存テスト"""
-        dialog = AppearanceDialog()
-
-        # サイズを設定
-        dialog.font_size_input.setText('16')
-        dialog.window_width_input.setText('450')
-        dialog.window_height_input.setText('350')
-        dialog.start_maximized_input.setChecked(False)
-
-        # モック化したsuperクラスのacceptメソッドでテスト
         with patch.object(QDialog, 'accept') as mock_accept:
-            dialog.accept()
-            mock_accept.assert_called_once()
+            button.click()
 
-        # 設定が保存されたことを確認
-        config = ConfigManager()
-        assert config.get_font_size() == 16
-        assert config.get_start_maximized() is False
-        window_size = config.get_window_size()
-        assert window_size[0] == 450
-        assert window_size[1] == 350
+        mock_accept.assert_called_once()
+        action.assert_called_once()
 
-    @pytest.mark.parametrize("width", ["", "5"])
+    def test_buttons(self, app):
+        dialog = SettingsDialog([("xlsm取り込み", MagicMock()), ("CSV出力", MagicMock())])
+
+        assert [b.text() for b in dialog.findChildren(QPushButton)] == ["xlsm取り込み", "CSV出力", "閉じる"]
+
+
+def make_document(staff_name: str | None = None, requested_date: str | None = None,
+                  note: str | None = None) -> Document:
+    return Document(1, '2025-01-10', 100, '山田　太郎', 'とても長い文書名' * 5, '内科', '田中',
+                    staff_name, requested_date, note, 3)
+
+
+class TestDocumentDetailDialog:
+    def test_shows_all_values(self, app):
+        dialog = DocumentDetailDialog(make_document('退職者', '2025-01-15', '至急'), ['山本'])
+
+        assert dialog.staff_input.currentText() == '退職者'
+        assert dialog.requested_date_input.date() == QDate(2025, 1, 15)
+        assert not dialog.no_requested_date_input.isChecked()
+        assert dialog.note_input.text() == '至急'
+        assert dialog.edited_document() == make_document('退職者', '2025-01-15', '至急')
+
+    def test_empty_requested_date(self, app):
+        dialog = DocumentDetailDialog(make_document(), ['山本'])
+
+        assert dialog.no_requested_date_input.isChecked()
+        assert not dialog.requested_date_input.isEnabled()
+        assert dialog.edited_document().requested_date is None
+
+    def test_edited_document(self, app):
+        dialog = DocumentDetailDialog(make_document(), ['山本'])
+        dialog.staff_input.setCurrentText('山本')
+        dialog.no_requested_date_input.setChecked(False)
+        dialog.requested_date_input.setDate(QDate(2025, 2, 3))
+        dialog.note_input.setText(' メモ ')
+
+        edited = dialog.edited_document()
+
+        assert (edited.staff_name, edited.requested_date, edited.note) == ('山本', '2025-02-03', 'メモ')
+        assert (edited.id, edited.version) == (1, 3)
+
+
+def check(dialog: ColumnFilterDialog, row: int, checked: bool) -> None:
+    item = dialog.value_list.item(row)
+    assert item is not None
+    item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+
+
+class TestColumnFilterDialog:
+    def test_all_checked_means_no_filter(self, app):
+        dialog = ColumnFilterDialog("担当者名", ['山本', ''], None)
+
+        assert get_item_text(dialog.value_list, 1) == "(空白)"
+        assert dialog.select_all_input.isChecked()
+        assert dialog.selected_values() is None
+
+    def test_selected_values(self, app):
+        dialog = ColumnFilterDialog("担当者名", ['山本', '植田', ''], {'山本'})
+
+        assert dialog.selected_values() == {'山本'}
+        check(dialog, 2, True)
+        assert dialog.selected_values() == {'山本', ''}
+
+    def test_select_all(self, app):
+        dialog = ColumnFilterDialog("担当者名", ['山本', '植田'], {'山本'})
+
+        dialog.set_all_checked(True)
+        assert dialog.selected_values() is None
+
+        dialog.set_all_checked(False)
+        assert dialog.checked_values() == set()
+
     @patch('app.dialogs.QMessageBox.warning')
-    def test_accept_invalid_input(self, mock_warning, width, app, backup_config):
-        """空欄や範囲外の値では保存せずに警告することのテスト"""
-        dialog = AppearanceDialog()
-        original_size = ConfigManager().get_window_size()
-        dialog.window_width_input.setText(width)
+    def test_rejects_nothing_checked(self, mock_warning, app):
+        dialog = ColumnFilterDialog("担当者名", ['山本'], None)
+        check(dialog, 0, False)
 
         with patch.object(QDialog, 'accept') as mock_accept:
             dialog.accept()
-            mock_accept.assert_not_called()
 
+        mock_accept.assert_not_called()
         mock_warning.assert_called_once()
-        assert ConfigManager().get_window_size() == original_size

@@ -94,22 +94,27 @@ class ConfigManager:
     def get_font_size(self) -> int:
         return self.config.getint('Appearance', 'font_size', fallback=9)
 
-    def set_font_size(self, size: int) -> None:
-        self._set('Appearance', {'font_size': str(size)})
-
     def get_window_size(self) -> tuple[int, int]:
         width = self.config.getint('Appearance', 'window_width', fallback=300)
         height = self.config.getint('Appearance', 'window_height', fallback=200)
         return width, height
 
-    def set_window_size(self, width: int, height: int) -> None:
-        self._set('Appearance', {'window_width': str(width), 'window_height': str(height)})
+    def get_window_position(self) -> tuple[int, int] | None:
+        """前回終了時のウィンドウの位置。保存されていなければ None"""
+        if not (self.config.has_option('Appearance', 'window_x') and self.config.has_option('Appearance', 'window_y')):
+            return None
+        return self.config.getint('Appearance', 'window_x'), self.config.getint('Appearance', 'window_y')
 
     def get_start_maximized(self) -> bool:
+        """前回終了時に最大化していたか"""
         return self.config.getboolean('Appearance', 'start_maximized', fallback=True)
 
-    def set_start_maximized(self, maximized: bool) -> None:
-        self._set('Appearance', {'start_maximized': str(maximized)})
+    def set_window_geometry(self, x: int, y: int, width: int, height: int, maximized: bool) -> None:
+        """終了時のウィンドウの位置・大きさ(最大化を解除したときのもの)と最大化の状態を保存する"""
+        self._set('Appearance', {
+            'window_x': str(x), 'window_y': str(y), 'window_width': str(width), 'window_height': str(height),
+            'start_maximized': str(maximized),
+        })
 
     def get_side_panel_width(self) -> int:
         return self.config.getint('Appearance', 'side_panel_width', fallback=200)
@@ -120,6 +125,14 @@ class ConfigManager:
     def get_staff_names(self) -> list[str]:
         """担当者名を一括登録するためのカンマ区切りのリスト"""
         return split_comma_list(self.config.get('Staff', 'ordered_names', fallback=''))
+
+    def get_exclude_docs(self) -> list[str]:
+        """除外する文書名を一括登録するためのカンマ区切りのリスト"""
+        return split_comma_list(self.config.get('ExcludeDocs', 'list', fallback=''))
+
+    def get_exclude_doctors(self) -> list[str]:
+        """除外する医師名を一括登録するためのカンマ区切りのリスト"""
+        return split_comma_list(self.config.get('ExcludeDoctors', 'list', fallback=''))
 
     def get_backup_retention_days(self) -> int:
         """バックアップファイルの保持日数を取得"""

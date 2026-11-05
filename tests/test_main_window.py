@@ -67,7 +67,6 @@ class FakeDocumentListWidget(QWidget):
         self.show_next_hit = MagicMock()
         self.show_previous_hit = MagicMock()
         self.refresh_timer = MagicMock()
-        self.apply_font_size = MagicMock()
         self.add_document = MagicMock()
         self.delete_selected = MagicMock()
         self.export_csv = MagicMock()
@@ -111,9 +110,12 @@ class TestMainWindow:
         assert QApplication.font().pointSize() == ConfigManager().get_font_size()
 
         assert all(__version__ not in label.text() for label in window.findChildren(QLabel))
-        for text in ("検索", "前へ", "次へ", "CSV取り込み", "xlsm取り込み", "行の追加", "行の削除", "CSV出力", "文書名", "医師名",
-                     "担当者名", "画面サイズ", "フォルダパス", "閉じる"):
+        for text in ("検索", "前へ", "次へ", "CSV取り込み", "行の追加", "行の削除", "文書名", "医師名",
+                     "担当者名", "設定", "閉じる"):
             find_button(window, text)
+        # xlsm取り込み・CSV出力・フォルダパスは設定ダイアログに移した
+        texts = [button.text() for button in window.findChildren(QPushButton)]
+        assert not {"xlsm取り込み", "CSV出力", "フォルダパス", "画面サイズ"} & set(texts)
 
     @patch('app.main_window.QMessageBox.critical')
     def test_open_document_list_error(self, mock_critical, app, backup_config, db_connect):
@@ -234,24 +236,55 @@ class TestMainWindow:
         assert parent is window
         mock_dialog.return_value.exec.assert_called_once()
 
-    @patch('app.main_window.AppearanceDialog')
-    def test_show_appearance_dialog(self, mock_dialog, app, backup_config, db_connect):
-        """外観設定ダイアログ表示テスト"""
+    @patch('app.main_window.SettingsDialog')
+    def test_show_settings_dialog(self, mock_dialog, app, backup_config, db_connect):
+        """設定ダイアログに xlsm取り込み・CSV出力・フォルダパスを渡す"""
         window = MainWindow()
-        window.show_appearance_dialog()
 
-        mock_dialog.assert_called_once_with(window)
+        find_button(window, "設定").click()
+
+        actions, parent = mock_dialog.call_args[0]
+        assert actions == [("xlsm取り込み", window.import_xlsm), ("CSV出力", window.export_csv),
+                           ("フォルダパス", window.show_folder_path_dialog)]
+        assert parent is window
         mock_dialog.return_value.exec.assert_called_once()
 
-    def test_apply_appearance(self, app, backup_config, db_connect):
-        """保存したフォントサイズを再起動せずにアプリ全体へ反映する"""
+    def test_window_geometry_is_saved_on_close(self, app, backup_config, db_connect):
+        """終了時の位置と大きさを保存し、次回はその位置と大きさで開く"""
         window = MainWindow()
-        ConfigManager().set_font_size(15)
+        window.setGeometry(120, 130, 900, 700)
+        window.show()
+        window.close()
 
-        window.apply_appearance()
+        config = ConfigManager()
+        assert config.get_window_position() == (120, 130)
+        assert config.get_window_size() == (900, 700)
+        assert config.get_start_maximized() is False
 
-        assert QApplication.font().pointSize() == 15
-        fake_widget(window).apply_font_size.assert_called_once()
+        reopened = MainWindow()
+        assert (reopened.x(), reopened.y()) == (120, 130)
+        assert (reopened.width(), reopened.height()) == (900, 700)
+
+    def test_window_geometry_saved_while_maximized(self, app, backup_config, db_connect):
+        """最大化したまま終了したら、最大化を解除したときの大きさと最大化の状態を保存する"""
+        window = MainWindow()
+        window.setGeometry(120, 130, 900, 700)
+        window.showMaximized()
+        app.processEvents()
+        window.close()
+
+        config = ConfigManager()
+        assert config.get_start_maximized() is True
+        assert config.get_window_size() == (900, 700)
+
+    def test_offscreen_position_is_ignored(self, app, backup_config, db_connect):
+        """保存した位置がどの画面にも入らなければ、大きさだけを戻す"""
+        ConfigManager().set_window_geometry(-50000, -50000, 900, 700, False)
+
+        window = MainWindow()
+
+        assert (window.x(), window.y()) != (-50000, -50000)
+        assert (window.width(), window.height()) == (900, 700)
 
     @patch('app.main_window.AddDocumentDialog')
     def test_add_document(self, mock_dialog, app, backup_config, db_connect):
@@ -283,7 +316,7 @@ class TestMainWindow:
     def test_export_csv(self, mock_save, mock_info, app, backup_config, db_connect):
         window = MainWindow()
 
-        find_button(window, "CSV出力").click()
+        window.export_csv()
 
         assert mock_save.call_args[0][2].endswith('.csv')
         fake_widget(window).export_csv.assert_called_once_with('C:/out/list.csv')

@@ -24,12 +24,10 @@ class TestConfigManager:
 
     def test_set_creates_section_and_saves(self, config: ConfigManager) -> None:
         """setter はセクションを作成してファイルに保存する"""
-        config.set_window_size(400, 300)
         config.set_backup_path(r"D:\backup")
         config.set_database_path(r"\\server\share\test.db")
 
         reloaded = ConfigManager(config.config_file)
-        assert reloaded.get_window_size() == (400, 300)
         assert reloaded.get_backup_path() == r"D:\backup"
         assert reloaded.get_database_path() == r"\\server\share\test.db"
 
@@ -39,14 +37,30 @@ class TestConfigManager:
 
         assert ConfigManager(config.config_file).get_staff_names() == ['植田', '花﨑', '山本']
 
+    def test_get_exclude_lists(self, config: ConfigManager) -> None:
+        config.config_file.write_text(
+            '[ExcludeDocs]\nlist = 紹介状, 訪問看護指示書,\n\n[ExcludeDoctors]\nlist = 清水,菅原\n', encoding='utf-8'
+        )
+
+        reloaded = ConfigManager(config.config_file)
+        assert reloaded.get_exclude_docs() == ['紹介状', '訪問看護指示書']
+        assert reloaded.get_exclude_doctors() == ['清水', '菅原']
+
+    def test_exclude_lists_default_empty(self, config: ConfigManager) -> None:
+        assert config.get_exclude_docs() == []
+        assert config.get_exclude_doctors() == []
+
     def test_appearance_defaults_and_save(self, config: ConfigManager) -> None:
         assert config.get_start_maximized() is True
         assert config.get_side_panel_width() == 200
+        assert config.get_window_position() is None
 
-        config.set_start_maximized(False)
+        config.set_window_geometry(10, 20, 800, 600, False)
         config.set_side_panel_width(320)
 
         reloaded = ConfigManager(config.config_file)
+        assert reloaded.get_window_position() == (10, 20)
+        assert reloaded.get_window_size() == (800, 600)
         assert reloaded.get_start_maximized() is False
         assert reloaded.get_side_panel_width() == 320
 

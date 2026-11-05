@@ -1,19 +1,40 @@
+import dataclasses
 import os
+from collections.abc import Callable
 from pathlib import Path
 
-from PyQt6.QtCore import QDate
-from PyQt6.QtGui import QIntValidator
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QLineEdit, QListWidget, QDialogButtonBox, QFileDialog,
-    QMessageBox, QCheckBox, QFormLayout
+    QLineEdit, QListWidget, QListWidgetItem, QDialogButtonBox, QFileDialog,
+    QMessageBox, QCheckBox, QComboBox, QDateEdit, QFormLayout, QWidget
 )
 
-from app.document_window import create_date_edit
-from services.document_repository import NewDocument
+from app.document_table_model import COLUMNS, NOTE_COLUMN, format_cell
+from services.document_repository import Document, NewDocument
 from services.list_repository import EXCLUDE_DOCS, EXCLUDE_DOCTORS, STAFF, ListRepository
 from services.validators import parse_patient_id
 from utils.config_manager import ConfigManager
+
+DISPLAY_DATE_FORMAT = 'yyyy/MM/dd'
+EMPTY_VALUE_LABEL = "(空白)"
+DETAIL_DIALOG_MIN_WIDTH = 480
+
+
+def create_date_edit(parent: QWidget | None = None) -> QDateEdit:
+    """▼でカレンダーを開ける日付欄"""
+    date_edit = QDateEdit(parent)
+    date_edit.setCalendarPopup(True)
+    date_edit.setDisplayFormat(DISPLAY_DATE_FORMAT)
+    return date_edit
+
+
+def create_ok_cancel_buttons(dialog: QDialog) -> QDialogButtonBox:
+    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    return buttons
+
 
 class ListItemDialog(QDialog):
     """DB に保存するリスト(除外する文書名・医師名、担当者名)の編集"""
@@ -81,19 +102,16 @@ class ListItemDialog(QDialog):
         super().accept()
 
 
-class ExcludeDocsDialog(ListItemDialog):
-    def __init__(self, repository: ListRepository, parent=None):
-        super().__init__("除外する文書名", EXCLUDE_DOCS, repository, parent)
+class ConfigListItemDialog(ListItemDialog):
+    """config.ini のカンマ区切りのリストで一覧を置き換えられるリストの編集"""
 
-
-class ExcludeDoctorsDialog(ListItemDialog):
-    def __init__(self, repository: ListRepository, parent=None):
-        super().__init__("除外する医師名", EXCLUDE_DOCTORS, repository, parent)
-
-
-class StaffNamesDialog(ListItemDialog):
-    def __init__(self, repository: ListRepository, parent=None):
-        super().__init__("担当者名", STAFF, repository, parent)
+    def __init__(self, title: str, category: str, config_key: str,
+                 read_config: Callable[[ConfigManager], list[str]], repository: ListRepository,
+                 parent: QWidget | None = None) -> None:
+        super().__init__(title, category, repository, parent)
+        self.title = title
+        self.config_key = config_key
+        self.read_config = read_config
         load_button = QPushButton("configから読み込み")
         load_button.clicked.connect(self.load_from_config)
         layout = self.layout()
@@ -102,13 +120,31 @@ class StaffNamesDialog(ListItemDialog):
             layout.insertWidget(layout.count() - 1, load_button)
 
     def load_from_config(self) -> None:
-        """一覧を config.ini の [Staff] ordered_names で置き換える(OK で DB に保存される)"""
-        names = ConfigManager().get_staff_names()
+        """一覧を config.ini のリストで置き換える(OK で DB に保存される)"""
+        names = self.read_config(ConfigManager())
         if not names:
-            QMessageBox.warning(self, "警告", "config.ini の [Staff] ordered_names に担当者名がありません。")
+            QMessageBox.warning(self, "警告", f"config.ini の {self.config_key} に{self.title}がありません。")
             return
         self.item_list.clear()
         self.item_list.addItems(names)
+
+
+class ExcludeDocsDialog(ConfigListItemDialog):
+    def __init__(self, repository: ListRepository, parent=None):
+        super().__init__("除外する文書名", EXCLUDE_DOCS, "[ExcludeDocs] list",
+                         lambda config: config.get_exclude_docs(), repository, parent)
+
+
+class ExcludeDoctorsDialog(ConfigListItemDialog):
+    def __init__(self, repository: ListRepository, parent=None):
+        super().__init__("除外する医師名", EXCLUDE_DOCTORS, "[ExcludeDoctors] list",
+                         lambda config: config.get_exclude_doctors(), repository, parent)
+
+
+class StaffNamesDialog(ConfigListItemDialog):
+    def __init__(self, repository: ListRepository, parent=None):
+        super().__init__("担当者名", STAFF, "[Staff] ordered_names",
+                         lambda config: config.get_staff_names(), repository, parent)
 
 
 class AddDocumentDialog(QDialog):
@@ -275,62 +311,131 @@ class FolderPathDialog(QDialog):
         super().accept()
 
 
-class AppearanceDialog(QDialog):
-    def __init__(self, parent=None):
+class SettingsDialog(QDialog):
+    """xlsm取り込み・CSV出力・フォルダパスのボタンをまとめたダイアログ。押したボタンの処理はダイアログを閉じてから行う"""
+
+    def __init__(self, actions: list[tuple[str, Callable[[], object]]], parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("フォントとウインドウサイズ")
+        self.setWindowTitle("設定")
         self.setModal(True)
+        layout = QVBoxLayout(self)
+        for text, action in actions:
+            button = QPushButton(text)
+            button.clicked.connect(lambda _checked, action=action: self.run(action))
+            layout.addWidget(button)
+        close_button = QPushButton("閉じる")
+        close_button.clicked.connect(self.reject)
+        layout.addWidget(close_button)
 
-        layout = QVBoxLayout()
+    def run(self, action: Callable[[], object]) -> None:
+        self.accept()
+        action()
 
-        layout.addWidget(QLabel("フォントサイズ:"))
-        self.font_size_input = QLineEdit()
-        self.font_size_input.setValidator(QIntValidator(6, 72))
-        layout.addWidget(self.font_size_input)
 
-        layout.addWidget(QLabel("ウィンドウの幅:"))
-        self.window_width_input = QLineEdit()
-        self.window_width_input.setValidator(QIntValidator(200, 3840))
-        layout.addWidget(self.window_width_input)
+class DocumentDetailDialog(QDialog):
+    """1行の全項目を表示し、担当者名・医師依頼日・備考を編集する"""
 
-        layout.addWidget(QLabel("ウィンドウの高さ:"))
-        self.window_height_input = QLineEdit()
-        self.window_height_input.setValidator(QIntValidator(150, 2160))
-        layout.addWidget(self.window_height_input)
+    def __init__(self, document: Document, staff_names: list[str], parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("行の詳細")
+        self.setModal(True)
+        self.setMinimumWidth(DETAIL_DIALOG_MIN_WIDTH)
+        self.document = document
 
-        self.start_maximized_input = QCheckBox("起動時に最大化する")
-        layout.addWidget(self.start_maximized_input)
+        layout = QFormLayout(self)
+        # 長い文書名なども折り返して全文を表示する(選んでコピーもできる)
+        for column, (heading, _) in enumerate(COLUMNS[:6]):
+            value_label = QLabel(format_cell(document, column))
+            value_label.setWordWrap(True)
+            value_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            layout.addRow(f"{heading}:", value_label)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok |
-            QDialogButtonBox.StandardButton.Cancel
+        self.staff_input = QComboBox()
+        names = ['', *staff_names]
+        # リストから外れた担当者が入力済みの行でも、今の値を消さない
+        if document.staff_name and document.staff_name not in names:
+            names.append(document.staff_name)
+        self.staff_input.addItems(names)
+        self.staff_input.setCurrentText(document.staff_name or '')
+        layout.addRow("担当者名:", self.staff_input)
+
+        self.requested_date_input = create_date_edit()
+        self.no_requested_date_input = QCheckBox("未設定")
+        self.no_requested_date_input.toggled.connect(self.requested_date_input.setDisabled)
+        requested_date = QDate.fromString(document.requested_date or '', 'yyyy-MM-dd')
+        self.requested_date_input.setDate(requested_date if requested_date.isValid() else QDate.currentDate())
+        self.no_requested_date_input.setChecked(document.requested_date is None)
+        requested_date_row = QHBoxLayout()
+        requested_date_row.addWidget(self.requested_date_input)
+        requested_date_row.addWidget(self.no_requested_date_input)
+        layout.addRow("医師依頼日:", requested_date_row)
+
+        self.note_input = QLineEdit(document.note or '')
+        layout.addRow(f"{COLUMNS[NOTE_COLUMN][0]}:", self.note_input)
+
+        layout.addRow(create_ok_cancel_buttons(self))
+
+    def edited_document(self) -> Document:
+        """入力内容を反映した行"""
+        requested_date = (None if self.no_requested_date_input.isChecked()
+                          else self.requested_date_input.date().toString('yyyy-MM-dd'))
+        return dataclasses.replace(
+            self.document,
+            staff_name=self.staff_input.currentText().strip() or None,
+            requested_date=requested_date,
+            note=self.note_input.text().strip() or None,
         )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
 
-        self.setLayout(layout)
 
-        self.config = ConfigManager()
-        self.load_settings()
+class ColumnFilterDialog(QDialog):
+    """列の値をチェックボックスで選んで絞り込む(Excel のオートフィルタに近い)"""
 
-    def load_settings(self):
-        self.font_size_input.setText(str(self.config.get_font_size()))
-        window_size = self.config.get_window_size()
-        self.window_width_input.setText(str(window_size[0]))
-        self.window_height_input.setText(str(window_size[1]))
-        self.start_maximized_input.setChecked(self.config.get_start_maximized())
+    def __init__(self, heading: str, values: list[str], selected: set[str] | None,
+                 parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(f"{heading}のフィルタ")
+        self.setModal(True)
+        self.values = values
+
+        layout = QVBoxLayout(self)
+        self.select_all_input = QCheckBox("すべて選択")
+        self.select_all_input.setChecked(selected is None)
+        self.select_all_input.clicked.connect(self.set_all_checked)
+        layout.addWidget(self.select_all_input)
+
+        self.value_list = QListWidget()
+        for value in values:
+            item = QListWidgetItem(value or EMPTY_VALUE_LABEL)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            checked = selected is None or value in selected
+            item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+            self.value_list.addItem(item)
+        layout.addWidget(self.value_list)
+
+        layout.addWidget(create_ok_cancel_buttons(self))
+
+    def set_all_checked(self, checked: bool) -> None:
+        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        for row in range(self.value_list.count()):
+            item = self.value_list.item(row)
+            if item is not None:
+                item.setCheckState(state)
+
+    def checked_values(self) -> set[str]:
+        checked = set()
+        for row, value in enumerate(self.values):
+            item = self.value_list.item(row)
+            if item is not None and item.checkState() == Qt.CheckState.Checked:
+                checked.add(value)
+        return checked
+
+    def selected_values(self) -> set[str] | None:
+        """表示する値。すべてチェックしていれば None(絞り込まない)"""
+        checked = self.checked_values()
+        return None if len(checked) == len(self.values) else checked
 
     def accept(self):
-        inputs = [self.font_size_input, self.window_width_input, self.window_height_input]
-        if not all(field.hasAcceptableInput() for field in inputs):
-            QMessageBox.warning(self, "警告", "入力値が範囲外です。")
+        if not self.checked_values():
+            QMessageBox.warning(self, "警告", "表示する値を1つ以上選んでください。")
             return
-
-        self.config.set_font_size(int(self.font_size_input.text()))
-        self.config.set_window_size(
-            int(self.window_width_input.text()),
-            int(self.window_height_input.text())
-        )
-        self.config.set_start_maximized(self.start_maximized_input.isChecked())
         super().accept()

@@ -55,6 +55,11 @@ def format_cell(document: Document, column: int) -> str:
     return str(value)
 
 
+def matches_filters(document: Document, filters: dict[int, set[str]]) -> bool:
+    """すべての列で、表示する値に含まれているか"""
+    return all(format_cell(document, column) in values for column, values in filters.items())
+
+
 class DocumentTableModel(QAbstractTableModel):
     """担当一覧の表。編集した値はすぐ DB に保存する"""
 
@@ -64,16 +69,43 @@ class DocumentTableModel(QAbstractTableModel):
     def __init__(self, repository: DocumentRepository) -> None:
         super().__init__()
         self.repository = repository
+        # all_documents は全行、documents はフィルタで残った表示中の行(どちらも現在の並び順)
+        self.all_documents: list[Document] = []
         self.documents: list[Document] = []
+        # 列ごとの表示する値(表示形式の文字列)。フィルタの無い列は含めない
+        self.filters: dict[int, set[str]] = {}
         self.sort_column = -1
         self.sort_descending = False
 
     def load(self) -> None:
-        """DB から読み直し、現在の並び順で並べる"""
+        """DB から読み直し、現在の並び順とフィルタで表示する"""
         documents = self.repository.fetch_all()
         self.beginResetModel()
-        self.documents = sort_documents(documents, self.sort_column, self.sort_descending)
+        self.all_documents = sort_documents(documents, self.sort_column, self.sort_descending)
+        self.documents = self.filtered_documents()
         self.endResetModel()
+
+    def filtered_documents(self) -> list[Document]:
+        return [doc for doc in self.all_documents if matches_filters(doc, self.filters)]
+
+    def set_filter(self, column: int, values: set[str] | None) -> None:
+        """列のフィルタを変える。values が None ならその列のフィルタを外す"""
+        if values is None:
+            self.filters.pop(column, None)
+        else:
+            self.filters[column] = values
+        self.beginResetModel()
+        self.documents = self.filtered_documents()
+        self.endResetModel()
+        self.headerDataChanged.emit(Qt.Orientation.Horizontal, column, column)
+
+    def column_values(self, column: int) -> list[str]:
+        """フィルタで選べる値。ほかの列のフィルタで残る行の値を、並べ替えと同じく空欄を末尾にして返す"""
+        other_filters = {col: values for col, values in self.filters.items() if col != column}
+        field = COLUMNS[column][1]
+        raw_values = {format_cell(doc, column): getattr(doc, field)
+                      for doc in self.all_documents if matches_filters(doc, other_filters)}
+        return sorted(raw_values, key=lambda text: (raw_values[text] in (None, ''), raw_values[text] or ''))
 
     def document(self, row: int) -> Document:
         return self.documents[row]
@@ -97,7 +129,8 @@ class DocumentTableModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
-            return COLUMNS[section][0]
+            # フィルタをかけている列は見出しに ▼ を付ける
+            return f"{COLUMNS[section][0]} ▼" if section in self.filters else COLUMNS[section][0]
         return super().headerData(section, orientation, role)
 
     def data(self, index: ModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -128,8 +161,13 @@ class DocumentTableModel(QAbstractTableModel):
             return False
         if edited == current:
             return False
+        return self.save_document(edited)
 
-        # Qt から呼ばれる関数なので、例外は外に出さずにシグナルで知らせる
+    def save_document(self, edited: Document) -> bool:
+        """担当者名・医師依頼日・備考を DB に保存し、表の行を置き換える
+
+        Qt から呼ばれる関数なので、例外は外に出さずにシグナルで知らせる
+        """
         try:
             saved = self.repository.update_editable_fields(edited)
         except sqlite3.Error as e:
@@ -139,8 +177,12 @@ class DocumentTableModel(QAbstractTableModel):
             self.conflict_detected.emit()
             return False
 
-        self.documents[index.row()] = saved
-        self.dataChanged.emit(index, index)
+        # 保存した値がフィルタに合わなくなっても、読み直すまでは行を残す
+        self.all_documents = [saved if doc.id == saved.id else doc for doc in self.all_documents]
+        row = self.find_row_by_id(saved.id)
+        if row is not None:
+            self.documents[row] = saved
+            self.dataChanged.emit(self.index(row, 0), self.index(row, len(COLUMNS) - 1))
         return True
 
     @staticmethod
@@ -157,5 +199,6 @@ class DocumentTableModel(QAbstractTableModel):
         self.sort_column = column
         self.sort_descending = order == Qt.SortOrder.DescendingOrder
         self.layoutAboutToBeChanged.emit()
-        self.documents = sort_documents(self.documents, self.sort_column, self.sort_descending)
+        self.all_documents = sort_documents(self.all_documents, self.sort_column, self.sort_descending)
+        self.documents = self.filtered_documents()
         self.layoutChanged.emit()
