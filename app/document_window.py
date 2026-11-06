@@ -3,7 +3,7 @@ import sqlite3
 from PyQt6.QtCore import (
     QAbstractItemModel, QDate, QEvent, QModelIndex, QObject, QPersistentModelIndex, QPoint, Qt, QTimer, pyqtSignal
 )
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtGui import QKeyEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QAbstractButton, QAbstractItemView, QApplication, QComboBox, QDateEdit, QMenu, QMessageBox, QStyle,
     QStyledItemDelegate, QStyleOptionHeader, QStyleOptionViewItem, QStylePainter, QTableView, QVBoxLayout, QWidget
@@ -26,6 +26,8 @@ ROW_PADDING = 8
 # 行番号の見出し(表の左上の角に表示する)と、その左右の余白(ピクセル)
 CORNER_LABEL = "番号"
 CORNER_LABEL_PADDING = 12
+# 医師依頼日の編集中に Delete キーで消去したことを日付欄に記録するプロパティ名
+CLEARED_PROPERTY = 'cleared'
 
 
 class CommitOnSelectDelegate(QStyledItemDelegate):
@@ -83,6 +85,15 @@ class RequestedDateDelegate(CommitOnSelectDelegate):
         date_edit.setDate(date)
         self.commit_and_close(date_edit)
 
+    def eventFilter(self, watched: QObject | None, event: QEvent | None) -> bool:
+        # 日付欄は空にできないため、編集中に Delete キーを押したら空欄として保存する
+        if (isinstance(watched, QDateEdit) and isinstance(event, QKeyEvent)
+                and event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Delete):
+            watched.setProperty(CLEARED_PROPERTY, True)
+            self.commit_and_close(watched)
+            return True
+        return super().eventFilter(watched, event)
+
     def setEditorData(self, editor: QWidget | None, index: QModelIndex | QPersistentModelIndex) -> None:
         if not isinstance(editor, QDateEdit):
             return
@@ -93,8 +104,8 @@ class RequestedDateDelegate(CommitOnSelectDelegate):
     def setModelData(self, editor: QWidget | None, model: QAbstractItemModel | None,
                      index: QModelIndex | QPersistentModelIndex) -> None:
         if isinstance(editor, QDateEdit) and model is not None:
-            model.setData(model.index(index.row(), index.column()),
-                          editor.date().toString(DISPLAY_DATE_FORMAT), Qt.ItemDataRole.EditRole)
+            text = '' if editor.property(CLEARED_PROPERTY) else editor.date().toString(DISPLAY_DATE_FORMAT)
+            model.setData(model.index(index.row(), index.column()), text, Qt.ItemDataRole.EditRole)
 
 
 class CornerLabelPainter(QObject):
@@ -147,7 +158,7 @@ class DocumentListWidget(QWidget):
         table.setModel(self.model)
         table.setItemDelegateForColumn(STAFF_COLUMN, StaffComboDelegate(self))
         table.setItemDelegateForColumn(REQUESTED_DATE_COLUMN, RequestedDateDelegate(self))
-        # 日付欄は空にできないため、セルを選んで Delete キーで消去する(編集中は日付欄側で処理される)
+        # 日付欄は空にできないため、セルを選んで Delete キーで消去する(編集中は RequestedDateDelegate で処理する)
         clear_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), table)
         clear_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
         clear_shortcut.activated.connect(self.clear_requested_date)

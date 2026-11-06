@@ -5,7 +5,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtCore import QDate, QModelIndex, QPoint
+from PyQt6.QtCore import QDate, QEvent, QModelIndex, QPoint, Qt
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateEdit, QMessageBox, QStyleOptionViewItem
 )
@@ -209,6 +210,19 @@ class TestRequestedDateDelegate:
         window.table.setCurrentIndex(self.index(window))
 
         window.clear_requested_date()
+
+        assert window.model.document(0).requested_date is None
+
+    def test_delete_key_while_editing_clears_date(self, window: DocumentListWidget):
+        """左クリックで編集中の日付欄でも Delete キーで消去できる"""
+        window.model.setData(self.index(window), '2025/01/15')
+        window.table.setCurrentIndex(self.index(window))
+        window.table.edit(self.index(window))
+        editor = window.table.findChild(QDateEdit)
+        assert isinstance(editor, QDateEdit)
+
+        QApplication.sendEvent(editor, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Delete,
+                                                 Qt.KeyboardModifier.NoModifier))
 
         assert window.model.document(0).requested_date is None
 
