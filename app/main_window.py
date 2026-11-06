@@ -137,7 +137,7 @@ class MainWindow(QMainWindow):
         add_button(search_input, "検索", self.search)
         panel.addLayout(search_input)
 
-        add_button(panel, "解除", self.clear_search)
+        add_button(panel, "絞り込み解除", self.clear_search)
 
         self.search_result_label = QLabel("")
         panel.addWidget(self.search_result_label)

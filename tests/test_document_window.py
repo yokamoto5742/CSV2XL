@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateEdit, QMessageBox, QStyleOptionViewItem
 )
 
-from app.document_table_model import REQUESTED_DATE_COLUMN, STAFF_COLUMN, ColumnFilter
+from app.document_table_model import NOTE_COLUMN, REQUESTED_DATE_COLUMN, STAFF_COLUMN, ColumnFilter
 from app.document_window import (
     COLUMN_WIDTHS, CORNER_LABEL_PADDING, ROW_PADDING, DocumentListWidget, RequestedDateDelegate, StaffComboDelegate
 )
@@ -313,6 +313,20 @@ class TestDetailDialog:
         triggers = window.table.editTriggers()
         assert not triggers & QAbstractItemView.EditTrigger.DoubleClicked
         assert triggers & QAbstractItemView.EditTrigger.EditKeyPressed
+
+
+class TestClickEdit:
+    @pytest.mark.parametrize("column", [STAFF_COLUMN, REQUESTED_DATE_COLUMN, NOTE_COLUMN])
+    def test_click_editable_column_starts_edit(self, window: DocumentListWidget, column: int):
+        """担当者名・医師依頼日・備考のセルは左クリックで編集を始める"""
+        window.table.clicked.emit(window.model.index(0, column))
+
+        assert window.table.state() == QAbstractItemView.State.EditingState
+
+    def test_click_other_column_does_not_start_edit(self, window: DocumentListWidget):
+        window.table.clicked.emit(window.model.index(0, 3))
+
+        assert window.table.state() != QAbstractItemView.State.EditingState
 
 
 def test_copy_cell(window: DocumentListWidget):

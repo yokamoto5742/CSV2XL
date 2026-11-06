@@ -10,7 +10,9 @@ from PyQt6.QtWidgets import (
 )
 
 from app.dialogs import DISPLAY_DATE_FORMAT, ColumnFilterDialog, DocumentDetailDialog, create_date_edit
-from app.document_table_model import COLUMNS, REQUESTED_DATE_COLUMN, STAFF_COLUMN, DocumentTableModel
+from app.document_table_model import (
+    COLUMNS, EDITABLE_COLUMNS, REQUESTED_DATE_COLUMN, STAFF_COLUMN, DocumentTableModel
+)
 from services.csv_export import write_csv
 from services.document_repository import DocumentRepository, NewDocument
 from services.list_repository import STAFF, ListRepository
@@ -45,6 +47,8 @@ class StaffComboDelegate(CommitOnSelectDelegate):
                      index: QModelIndex | QPersistentModelIndex) -> QWidget:
         combo = QComboBox(parent)
         combo.activated.connect(lambda: self.commit_and_close(combo))
+        # 編集を始めたらすぐに選択肢を開く(表示されてから開く)
+        QTimer.singleShot(0, combo.showPopup)
         return combo
 
     def setEditorData(self, editor: QWidget | None, index: QModelIndex | QPersistentModelIndex) -> None:
@@ -149,9 +153,10 @@ class DocumentListWidget(QWidget):
         clear_shortcut.activated.connect(self.clear_requested_date)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        # ダブルクリックは詳細ダイアログを開くため、セルの直接編集は F2 キーと文字の入力だけにする
+        # ダブルクリックは詳細ダイアログを開くため、セルの直接編集は左クリック・F2 キー・文字の入力で始める
         table.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed
                               | QAbstractItemView.EditTrigger.AnyKeyPressed)
+        table.clicked.connect(self.start_cell_edit)
         table.doubleClicked.connect(self.show_detail)
         table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         table.customContextMenuRequested.connect(self.show_cell_menu)
@@ -301,6 +306,11 @@ class DocumentListWidget(QWidget):
         edited = dialog.edited_document()
         if edited != document:
             self.model.save_document(edited)
+
+    def start_cell_edit(self, index: QModelIndex) -> None:
+        """担当者名・医師依頼日・備考のセルは左クリックでそのセルだけ編集する"""
+        if index.column() in EDITABLE_COLUMNS:
+            self.table.edit(index)
 
     def show_cell_menu(self, position: QPoint) -> None:
         index = self.table.indexAt(position)

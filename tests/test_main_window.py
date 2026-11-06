@@ -112,7 +112,7 @@ class TestMainWindow:
         assert QApplication.font().pointSize() == ConfigManager().get_font_size()
 
         assert all(__version__ not in label.text() for label in window.findChildren(QLabel))
-        for text in ("検索", "解除", "CSV取り込み", "行の追加", "行の削除", "文書名", "医師名", "設定", "閉じる"):
+        for text in ("検索", "絞り込み解除", "CSV取り込み", "行の追加", "行の削除", "文書名", "医師名", "設定", "閉じる"):
             find_button(window, text)
         # xlsm取り込み・CSV出力・フォルダパス・担当者名は設定ダイアログに移した
         texts = [button.text() for button in window.findChildren(QPushButton)]
@@ -206,7 +206,7 @@ class TestMainWindow:
         assert db_connect.call_count == 2
 
     def test_search(self, app, backup_config, db_connect):
-        """検索欄の患者IDで担当一覧を絞り込み、件数を左側に表示する。解除で検索欄も空にする"""
+        """検索欄の患者IDで担当一覧を絞り込み、件数を左側に表示する。絞り込み解除で検索欄も空にする"""
         window = MainWindow()
         document_widget = fake_widget(window)
 
@@ -217,7 +217,7 @@ class TestMainWindow:
         document_widget.search.assert_called_once_with('100')
         assert window.search_result_label.text() == "患者ID 100: 2件"
 
-        find_button(window, "解除").click()
+        find_button(window, "絞り込み解除").click()
         document_widget.clear_search.assert_called_once()
         assert window.patient_id_input.text() == ''
 
