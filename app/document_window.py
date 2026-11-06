@@ -14,7 +14,7 @@ from app.document_table_model import (
     COLUMNS, EDITABLE_COLUMNS, REQUESTED_DATE_COLUMN, STAFF_COLUMN, DocumentTableModel
 )
 from services.csv_export import write_csv
-from services.document_repository import DocumentRepository, NewDocument
+from services.document_repository import Document, DocumentRepository, NewDocument
 from services.list_repository import STAFF, ListRepository
 from services.validators import parse_patient_id
 
@@ -28,6 +28,18 @@ CORNER_LABEL = "番号"
 CORNER_LABEL_PADDING = 12
 # 医師依頼日の編集中に Delete キーで消去したことを日付欄に記録するプロパティ名
 CLEARED_PROPERTY = 'cleared'
+# 削除の確認で表示する行数の上限
+DELETE_CONFIRM_MAX_ROWS = 10
+
+
+def delete_confirmation_message(documents: list[Document]) -> str:
+    """削除の確認文。行が多いときは先頭の数行だけを表示する"""
+    lines = [f"患者ID: {doc.patient_id}  {doc.patient_name}  文書名: {doc.document_name}"
+             for doc in documents[:DELETE_CONFIRM_MAX_ROWS]]
+    hidden_count = len(documents) - DELETE_CONFIRM_MAX_ROWS
+    if hidden_count > 0:
+        lines.append(f"ほか {hidden_count} 件")
+    return f"次の {len(documents)} 行を削除しますか?\n\n" + "\n".join(lines)
 
 
 class CommitOnSelectDelegate(QStyledItemDelegate):
@@ -163,7 +175,8 @@ class DocumentListWidget(QWidget):
         clear_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
         clear_shortcut.activated.connect(self.clear_requested_date)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        # Ctrl+クリックで1行ずつ、Shift+クリックで範囲を追加して選べる(一括削除用)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         # ダブルクリックは詳細ダイアログを開くため、セルの直接編集は左クリック・F2 キー・文字の入力で始める
         table.setEditTriggers(QAbstractItemView.EditTrigger.EditKeyPressed
                               | QAbstractItemView.EditTrigger.AnyKeyPressed)
@@ -283,21 +296,25 @@ class DocumentListWidget(QWidget):
             self.table.selectRow(row)
             self.table.scrollTo(self.model.index(row, 0), QAbstractItemView.ScrollHint.PositionAtCenter)
 
+    def selected_documents(self) -> list[Document]:
+        """選んだ行(画面の並び順)"""
+        selection_model = self.table.selectionModel()
+        if selection_model is None:
+            return []
+        rows = sorted(index.row() for index in selection_model.selectedRows())
+        return [self.model.document(row) for row in rows]
+
     def delete_selected(self) -> None:
-        """選んだ行を確認してから削除する"""
-        index = self.table.currentIndex()
-        if not index.isValid():
+        """選んだ行(複数可)を確認してから削除する"""
+        documents = self.selected_documents()
+        if not documents:
             QMessageBox.information(self, "行の削除", "削除する行を選んでください。")
             return
-        document = self.model.document(index.row())
-        answer = QMessageBox.question(
-            self, "行の削除",
-            f"次の行を削除しますか?\n\n患者ID: {document.patient_id}  {document.patient_name}\n文書名: {document.document_name}"
-        )
+        answer = QMessageBox.question(self, "行の削除", delete_confirmation_message(documents))
         if answer != QMessageBox.StandardButton.Yes:
             return
         try:
-            deleted = self.repository.delete_document(document)
+            deleted = self.repository.delete_documents(documents)
         except sqlite3.Error as e:
             self.show_error(f"行の削除に失敗しました。\n{e}")
             return
@@ -319,8 +336,10 @@ class DocumentListWidget(QWidget):
             self.model.save_document(edited)
 
     def start_cell_edit(self, index: QModelIndex) -> None:
-        """担当者名・医師依頼日・備考のセルは左クリックでそのセルだけ編集する"""
-        if index.column() in EDITABLE_COLUMNS:
+        """担当者名・医師依頼日・備考のセルは左クリックでそのセルだけ編集する(Ctrl/Shift+クリックは行の選択)"""
+        selecting_rows = QApplication.keyboardModifiers() & (Qt.KeyboardModifier.ControlModifier
+                                                             | Qt.KeyboardModifier.ShiftModifier)
+        if index.column() in EDITABLE_COLUMNS and not selecting_rows:
             self.table.edit(index)
 
     def show_cell_menu(self, position: QPoint) -> None:

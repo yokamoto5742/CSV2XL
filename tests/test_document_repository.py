@@ -179,6 +179,36 @@ class TestDeleteDocument:
             conn_b.close()
 
 
+class TestDeleteDocuments:
+    def test_deletes_all(self, connection: sqlite3.Connection) -> None:
+        repository = DocumentRepository(connection)
+        repository.add_new_documents([make_new_document(1), make_new_document(2), make_new_document(3)])
+        documents = repository.fetch_all()
+
+        assert repository.delete_documents([documents[0], documents[2]]) is True
+
+        assert [doc.patient_id for doc in repository.fetch_all()] == [2]
+
+    def test_conflict_deletes_nothing(self, tmp_path: Path) -> None:
+        """1行でも別端末が先に更新していたら、1行も削除しない"""
+        db_path = str(tmp_path / 'shared.db')
+        conn_a = connect(db_path)
+        conn_b = connect(db_path)
+        try:
+            repo_a = DocumentRepository(conn_a)
+            repo_b = DocumentRepository(conn_b)
+            repo_a.add_new_documents([make_new_document(1), make_new_document(2)])
+            docs_a = repo_a.fetch_all()
+            repo_b.update_editable_fields(dataclasses.replace(repo_b.fetch_all()[1], note='B'))
+
+            assert repo_a.delete_documents(docs_a) is False
+            assert len(repo_a.fetch_all()) == 2
+            assert len(repo_b.fetch_all()) == 2
+        finally:
+            conn_a.close()
+            conn_b.close()
+
+
 class TestDataVersion:
     def test_changes_when_other_connection_commits(self, tmp_path: Path) -> None:
         db_path = str(tmp_path / 'shared.db')

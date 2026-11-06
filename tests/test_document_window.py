@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtCore import QDate, QEvent, QModelIndex, QPoint, Qt
+from PyQt6.QtCore import QDate, QEvent, QItemSelectionModel, QModelIndex, QPoint, Qt
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDateEdit, QMessageBox, QStyleOptionViewItem
@@ -13,7 +13,8 @@ from PyQt6.QtWidgets import (
 
 from app.document_table_model import NOTE_COLUMN, REQUESTED_DATE_COLUMN, STAFF_COLUMN, ColumnFilter
 from app.document_window import (
-    COLUMN_WIDTHS, CORNER_LABEL_PADDING, ROW_PADDING, DocumentListWidget, RequestedDateDelegate, StaffComboDelegate
+    COLUMN_WIDTHS, CORNER_LABEL_PADDING, DELETE_CONFIRM_MAX_ROWS, ROW_PADDING, DocumentListWidget,
+    RequestedDateDelegate, StaffComboDelegate, delete_confirmation_message
 )
 from services.database import connect
 from services.document_repository import DocumentRepository
@@ -47,6 +48,15 @@ def selected_row(window: DocumentListWidget) -> int:
     selection_model = window.table.selectionModel()
     assert selection_model is not None
     return selection_model.selectedRows()[0].row()
+
+
+def select_rows(window: DocumentListWidget, rows: list[int]) -> None:
+    """Ctrl+クリックと同じく、複数の行を追加して選ぶ"""
+    selection_model = window.table.selectionModel()
+    assert selection_model is not None
+    for row in rows:
+        selection_model.select(window.model.index(row, 0), QItemSelectionModel.SelectionFlag.Select
+                               | QItemSelectionModel.SelectionFlag.Rows)
 
 
 @pytest.fixture
@@ -252,6 +262,36 @@ class TestAddAndDelete:
         assert window.model.rowCount() == 2
         assert window.model.find_row_by_id(target.id) is None
 
+    @patch('app.document_window.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes)
+    def test_delete_multiple_rows(self, mock_question, window: DocumentListWidget):
+        """Ctrl/Shift+クリックで選んだ複数行をまとめて削除する"""
+        select_rows(window, [0, 2])
+        kept = window.model.document(1)
+
+        window.delete_selected()
+
+        assert "次の 2 行を削除しますか?" in mock_question.call_args[0][2]
+        assert [doc.id for doc in window.model.documents] == [kept.id]
+
+    @patch('app.document_window.QMessageBox.warning')
+    @patch('app.document_window.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes)
+    def test_delete_multiple_conflict_deletes_nothing(self, mock_question, mock_warning,
+                                                      window: DocumentListWidget, tmp_path: Path):
+        """選んだ行の1行でも他の端末で更新されていたら、1行も削除しない"""
+        select_rows(window, [0, 1, 2])
+        other = connect(str(tmp_path / 'test.db'))
+        try:
+            other_repository = DocumentRepository(other)
+            target = next(doc for doc in other_repository.fetch_all() if doc.id == window.model.document(2).id)
+            other_repository.update_editable_fields(dataclasses.replace(target, note='他端末'))
+        finally:
+            other.close()
+
+        window.delete_selected()
+
+        mock_warning.assert_called_once()
+        assert window.model.rowCount() == 3
+
     @patch('app.document_window.QMessageBox.question', return_value=QMessageBox.StandardButton.No)
     def test_delete_cancelled(self, mock_question, window: DocumentListWidget):
         window.table.selectRow(1)
@@ -341,6 +381,32 @@ class TestClickEdit:
         window.table.clicked.emit(window.model.index(0, 3))
 
         assert window.table.state() != QAbstractItemView.State.EditingState
+
+    @pytest.mark.parametrize("modifier", [Qt.KeyboardModifier.ControlModifier, Qt.KeyboardModifier.ShiftModifier])
+    def test_click_with_modifier_does_not_start_edit(self, window: DocumentListWidget,
+                                                     modifier: Qt.KeyboardModifier):
+        """Ctrl/Shift+クリックは行を選ぶ操作なので編集を始めない"""
+        with patch('app.document_window.QApplication.keyboardModifiers', return_value=modifier):
+            window.table.clicked.emit(window.model.index(0, NOTE_COLUMN))
+
+        assert window.table.state() != QAbstractItemView.State.EditingState
+
+
+class TestDeleteConfirmationMessage:
+    def test_lists_all_rows_when_few(self, window: DocumentListWidget):
+        message = delete_confirmation_message(window.model.documents)
+
+        assert message.startswith("次の 3 行を削除しますか?")
+        assert message.count("患者ID:") == 3
+        assert "ほか" not in message
+
+    def test_shows_remaining_count_when_many(self, window: DocumentListWidget):
+        documents = [window.model.document(0)] * (DELETE_CONFIRM_MAX_ROWS + 5)
+
+        message = delete_confirmation_message(documents)
+
+        assert message.count("患者ID:") == DELETE_CONFIRM_MAX_ROWS
+        assert message.endswith("ほか 5 件")
 
 
 def test_copy_cell(window: DocumentListWidget):

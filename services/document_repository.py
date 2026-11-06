@@ -74,13 +74,22 @@ class DocumentRepository:
 
     def delete_document(self, document: Document) -> bool:
         """削除済みにする。読み込み後に別端末で更新されていた場合は削除せずに False を返す"""
+        return self.delete_documents([document])
+
+    def delete_documents(self, documents: list[Document]) -> bool:
+        """まとめて削除済みにする。1行でも読み込み後に別端末で更新されていたら、1行も削除せずに False を返す"""
+        now = now_text()
         with self.connection:
-            cursor = self.connection.execute(
-                "UPDATE documents SET deleted = 1, version = version + 1, updated_at = ?"
-                " WHERE id = ? AND version = ? AND deleted = 0",
-                (now_text(), document.id, document.version)
-            )
-        return cursor.rowcount > 0
+            for document in documents:
+                cursor = self.connection.execute(
+                    "UPDATE documents SET deleted = 1, version = version + 1, updated_at = ?"
+                    " WHERE id = ? AND version = ? AND deleted = 0",
+                    (now, document.id, document.version)
+                )
+                if cursor.rowcount == 0:
+                    self.connection.rollback()
+                    return False
+        return True
 
     def add_new_documents(self, documents: list[NewDocument]) -> int:
         """既存行と A〜F 列が同じものを除いて追加し、追加した件数を返す
